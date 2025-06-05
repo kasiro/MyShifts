@@ -1,0 +1,2089 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="red">
+  <title>Управление производством</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f8fafc;
+      color: #1e293b;
+      overflow-x: hidden;
+    }
+    #root {
+      padding: 20px;
+      min-height: 100vh;
+      box-sizing: border-box;
+      position: relative;
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #1e293b;
+      text-align: center;
+      margin-bottom: 20px;
+      margin-bottom: 30px; /* Добавлен отступ снизу для заголовка */
+      font-weight: bold; /* Сделан жирным */
+    }
+    .tasks-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 16px;
+      padding-bottom: 60px;
+    }
+    .task-card {
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .task-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .task-field {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      color: #1e293b;
+    }
+    .task-field.materials_ {
+      display: flex;
+      flex-direction: column;
+      max-width: 100%;
+      font-size: 0.9rem;
+      color: #1e293b;
+    }
+    .task-field-label {
+      font-weight: 600;
+      color: #64748b;
+    }
+    .task-field-value {
+      color: #1e293b;
+      /* max-width: 60%; */
+      word-wrap: break-word;
+    }
+    .material-list {
+      list-style: none;
+      padding: 0;
+      padding-top: 8px;
+      /* padding-bottom: 8px; */
+      /* gap: 8px; */
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      max-width: 100%;
+    }
+    .material-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #f1f5f9;
+      border-left: 4px solid #a16ff7;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      color: #1e293b;
+      /* transition: background-color 0.2s; */
+      margin-bottom: 8px;
+    }
+    .nopay-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: transparent;
+      /* background: #fff; */
+      border-radius: 6px;
+      font-size: 0.9rem;
+      color: #1e293b;
+      margin-bottom: 8px;
+      /* border: 4px solid #fff; */
+      box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.20);
+    }
+    .material-item:hover {
+      background: #e2e8f0;
+    }
+    .material-item svg {
+      width: 18px;
+      height: 18px;
+      color: #a16ff7;
+      flex-shrink: 0;
+    }
+    .material-text {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+    }
+    .material-name {
+      font-weight: 500;
+      color: #1e293b;
+    }
+    .material-count {
+      background: #e0d1ff;
+      color: #6a3da8;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      animation: fadeIn 0.3s ease;
+    }
+    .modal-content {
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+      position: relative;
+      padding-bottom: 70px;
+    }
+    .modal-content h2 {
+      color: #1e293b;
+    }
+    .close-button {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: #64748b;
+      cursor: pointer;
+      transition: color 0.2s;
+      padding: 8px 12px;
+      min-height: 48px;
+    }
+    .close-button:hover {
+      color: #1e293b;
+    }
+    .add-button {
+      position: fixed;
+      bottom: 100px;
+      right: 24px;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #a16ff7;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(161, 111, 247, 0.3);
+      transition: transform 0.2s ease, background-color 0.3s;
+      padding: 12px;
+      font-size: 1rem;
+      z-index: 1100;
+    }
+    .add-button:hover {
+      transform: scale(1.1);
+      background: #8a5ce6;
+    }
+    .action-button {
+      padding: 12px 20px;
+      border-radius: 8px;
+      transition: background-color 0.2s, transform 0.2s;
+      color: white;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      min-height: 48px;
+    }
+    .edit-button {
+      background: #10b981;
+    }
+    .edit-button:hover {
+      background: #059669;
+      transform: translateY(-1px);
+    }
+    .delete-button {
+      background: #ef4444;
+      flex: 1;
+      text-align: center;
+    }
+    .confirm-delete {
+  background-color: #ef4444;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+    /* .delete-button:hover { */
+    /*   background: #dc2626; */
+    /*   transform: translateY(-1px); */
+    /* } */
+    .form-input,
+    .form-textarea,
+    .form-select {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 10px;
+      border-radius: 6px;
+      color: #1e293b;
+      width: 100%;
+      margin-bottom: 12px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      font-size: 0.9rem;
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+    }
+    .form-textarea {
+      min-height: 150px;
+      resize: vertical;
+    }
+    .form-input:focus,
+    .form-textarea:focus,
+    .form-select:focus {
+      outline: none;
+      border-color: #a16ff7;
+      box-shadow: 0 0 0 3px rgba(161, 111, 247, 0.1);
+    }
+    .form-label {
+      display: block;
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .material-row {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .material-input {
+      width: 100%;
+    }
+    .material-add-button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: #10b981;
+      color: white;
+      font-weight: 500;
+      transition: background-color 0.2s, transform 0.2s;
+      font-size: 0.9rem;
+      min-height: 48px;
+      margin-bottom: 12px;
+      border: none;
+      cursor: pointer;
+    }
+    .material-add-button:hover {
+      background: #059669;
+      transform: translateY(-1px);
+    }
+    .material-remove-button {
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #ef4444;
+      color: white;
+      font-weight: 500;
+      transition: background-color 0.2s, transform 0.2s;
+      font-size: 0.9rem;
+      border: none;
+      cursor: pointer;
+    }
+    /* .material-remove-button:hover { */
+    /*   background: #dc2626; */
+    /*   transform: translateY(-1px); */
+    /* } */
+    .submit-button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      background: #a16ff7;
+      color: white;
+      font-weight: 500;
+      transition: background-color 0.2s, transform 0.2s;
+      font-size: 1rem;
+      min-height: 48px;
+      border: none;
+      cursor: pointer;
+    }
+    /* .submit-button:hover { */
+    /*   background: #8a5ce6; */
+    /*   transform: translateY(-1px); */
+    /* } */
+    .submit-button svg {
+      width: 18px;
+      height: 18px;
+    }
+    .clear-button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      background: #6b7280;
+      color: white;
+      font-weight: 500;
+      transition: background-color 0.2s, transform 0.2s;
+      font-size: 1rem;
+      min-height: 48px;
+      border: none;
+      cursor: pointer;
+    }
+    .clear-button:hover {
+      background: #4b5563;
+      transform: translateY(-1px);
+    }
+    .clear-button svg {
+      width: 18px;
+      height: 18px;
+    }
+    .nav-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 96%;
+      /* background: #ffffff; */
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.10);
+      display: flex;
+      justify-content: space-around;
+      padding: 15px 0;
+      z-index: 1200;
+      border-radius: 15px;
+      margin-bottom: 10px;
+      margin-left: 8px;
+      margin-right: 5px;
+      backdrop-filter: blur(15px);
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #64748b;
+      text-decoration: none;
+      font-size: 0.75rem;
+      transition: color 0.6s;
+    }
+    .nav-item svg {
+      width: 20px;
+      height: 20px;
+      margin-bottom: 4px;
+    }
+    .nav-item.active {
+      color: #a16ff7;
+      font-weight: bold;
+      transform: scale(1.1) translate(0, -7%);
+      transition: transform 0.3s;
+    }
+    .stats-container, .settings-container {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      padding: 20px;
+      padding-bottom: 60px;
+    }
+    .material-stats {
+      margin-top: 20px;
+    }
+    .material-stats-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    .material-stats-table th,
+    .material-stats-table td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 0.9rem;
+    }
+    .material-stats-table th {
+      background: #f1f5f9;
+      font-weight: 600;
+      color: #64748b;
+    }
+    .material-stats-table td {
+      color: #1e293b;
+    }
+    .chart-container {
+      margin-top: 20px;
+      padding: 16px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .chart-canvas {
+      min-height: 300px;
+      width: 100%;
+    }
+    .settings-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .settings-buttons .submit-button,
+    .settings-buttons .clear-button {
+      width: 100%;
+    }
+    .material-mode-toggle {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .material-mode-toggle label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: #64748b;
+      cursor: pointer;
+    }
+    .material-mode-toggle input[type="radio"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #a16ff7;
+    }
+    .filter-container {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      padding: 16px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+    .sort-button {
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: #6b7280;
+      color: white;
+      font-weight: 500;
+      transition: background-color 0.2s, transform 0.2s;
+      font-size: 0.9rem;
+      border: none;
+      cursor: pointer;
+    }
+    .sort-button:hover {
+      background: #4b5563;
+      transform: translateY(-1px);
+    }
+    .reset-button {
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: #ef4444;
+      color: white;
+      font-weight: 500;
+      transition: background-color 0.2s, transform 0.2s;
+      font-size: 0.9rem;
+      border: none;
+      cursor: pointer;
+    }
+    .reset-button:hover {
+      background: #dc2626;
+      transform: translateY(-1px);
+    }
+    @media (max-width: 768px) {
+      .task-card {
+        padding: 12px;
+        font-size: 0.85rem;
+      }
+      .task-field {
+        font-size: 0.85rem;
+      }
+      .task-field.description {
+          display: flex;
+          flex-direction: column;
+      }
+      .task-field-value.description {
+          display: flex;
+          padding-top: 8px;
+          justify-content: center;
+      }
+      .task-field-value {
+        max-width: 100%;
+      }
+      
+      .action-button {
+        padding: 10px 16px;
+        font-size: 0.9rem;
+      }
+      .modal-content {
+        width: 95%;
+        padding: 16px;
+        padding-bottom: 70px;
+      }
+      .form-input,
+      .form-textarea,
+      .form-select {
+        font-size: 0.9rem;
+      }
+      .add-button {
+        bottom: 100px;
+        right: 16px;
+        width: 56px;
+        height: 56px;
+      }
+      .submit-button,
+      .clear-button {
+        padding: 10px 16px;
+        font-size: 0.9rem;
+      }
+      .nav-item {
+        font-size: 0.7rem;
+        font-weight: bold;
+      }
+      .nav-item svg {
+        width: 18px;
+        height: 18px;
+      }
+      .material-stats-table th,
+      .material-stats-table td {
+        font-size: 0.8rem;
+        padding: 6px;
+      }
+      .material-item {
+        font-size: 0.85rem;
+        padding: 6px 10px;
+      }
+      .material-item svg {
+        width: 16px;
+        height: 16px;
+      }
+      .material-count {
+        font-size: 0.8rem;
+        padding: 1px 6px;
+      }
+      .material-mode-toggle label {
+        font-size: 0.85rem;
+      }
+      .filter-row {
+        flex-direction: column;
+        gap: 8px;
+      }
+      .sort-button,
+      .reset-button {
+        width: 100%;
+        font-size: 0.85rem;
+      }
+    }
+    #error-message {
+      color: #ef4444;
+      padding: 20px;
+      text-align: center;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div id="error-message" style="display: none;"></div>
+
+  <script>
+    const dependencies = [
+      { src: 'https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js', global: 'React' },
+      { src: 'https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js', global: 'ReactDOM' },
+      { src: 'https://cdn.jsdelivr.net/npm/@babel/standalone@7.25.7/babel.min.js', global: 'Babel' },
+      { src: 'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js', global: 'Chart' }
+    ];
+
+    let loadedDependencies = 0;
+
+    function loadDependency(index) {
+      if (index >= dependencies.length) {
+        console.log('Все зависимости загружены, запуск приложения...');
+        loadApplication();
+        return;
+      }
+
+      const { src, global } = dependencies[index];
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.onload = () => {
+        console.log(`${global} успешно загружен.`);
+        loadedDependencies++;
+        loadDependency(index + 1);
+      };
+      script.onerror = () => {
+        console.error(`Ошибка загрузки ${global} из ${src}.`);
+        const errorMessage = document.getElementById('error-message');
+        errorMessage.style.display = 'block';
+        errorMessage.textContent = `Ошибка: Не удалось загрузить ${global}. Проверьте подключение к интернету или консоль.`;
+      };
+      document.head.appendChild(script);
+    }
+
+    function loadApplication() {
+      try {
+        console.log('Проверка зависимостей...');
+        if (!window.React || !window.ReactDOM || !window.Babel || !window.Chart) {
+          throw new Error('Одна или несколько зависимостей не загружены: ' + 
+            `React: ${!!window.React}, ReactDOM: ${!!window.ReactDOM}, Babel: ${!!window.Babel}, Chart: ${!!window.Chart}`);
+        }
+        if (!document.getElementById('root')) {
+          throw new Error('Элемент #root не найден в DOM.');
+        }
+
+        console.log('Трансформация JSX-кода...');
+        const jsxCode = document.getElementById('jsx-code').textContent;
+        let transformedCode;
+        try {
+          transformedCode = Babel.transform(jsxCode, { 
+            presets: ['env', 'react'],
+            filename: 'index.js'
+          }).code;
+          console.log('JSX успешно преобразован, длина кода:', transformedCode.length);
+        } catch (babelError) {
+          throw new Error('Ошибка трансформации JSX: ' + babelError.message);
+        }
+
+        console.log('Выполнение преобразованного кода...');
+        const script = document.createElement('script');
+        script.textContent = transformedCode;
+        document.body.appendChild(script);
+        console.log('Преобразованный код добавлен в DOM.');
+      } catch (error) {
+        console.error('Ошибка при выполнении приложения:', error);
+        const errorMessage = document.getElementById('error-message');
+        errorMessage.style.display = 'block';
+        errorMessage.textContent = `Произошла ошибка: ${error.message}. Проверьте консоль для подробностей.`;
+      }
+    }
+
+    console.log('Начало загрузки зависимостей...');
+    loadDependency(0);
+  </script>
+
+  <script id="jsx-code" type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    const { createRoot } = ReactDOM;
+
+    const initialTasks = [];
+
+    const initialSections = [];
+    const initialMaterials = [];
+
+    function App() {
+
+      const round = (num, decimalPlaces) => {
+    const factor = Math.pow(10, decimalPlaces);
+    return Math.trunc(num * factor) / factor;
+};
+
+      const [tasks, setTasks] = useState(() => {
+        try {
+          const savedTasks = localStorage.getItem('tasks');
+          console.log('Данные из localStorage (tasks):', savedTasks ? JSON.parse(savedTasks).slice(0, 2) : 'Отсутствуют');
+          if (!savedTasks) {
+            console.log('Используются начальные задачи.');
+            return initialTasks.map(task => ({ ...task, id: task.id || Date.now() + Math.random() }));
+          }
+          const parsedTasks = JSON.parse(savedTasks);
+          if (!Array.isArray(parsedTasks)) {
+            console.warn('Данные в localStorage не являются массивом, возвращены начальные задачи.');
+            return initialTasks.map(task => ({ ...task, id: task.id || Date.now() + Math.random() }));
+          }
+          console.log('Загружено', parsedTasks.length, 'задач из localStorage.');
+          return parsedTasks.map(task => ({
+            ...task,
+            id: task.id || Date.now() + Math.random(),
+            materials: task.materials && Array.isArray(task.materials) ? task.materials : task.material ? [{ material: task.material, count: task.count || 0 }] : []
+          }));
+        } catch (e) {
+          console.error('Ошибка при загрузке задач из localStorage:', e);
+          return initialTasks.map(task => ({ ...task, id: task.id || Date.now() + Math.random() }));
+        }
+      });
+      const [sections, setSections] = useState(() => {
+        try {
+          const savedSections = localStorage.getItem('sections');
+          console.log('Данные из localStorage (sections):', savedSections ? JSON.parse(savedSections) : 'Отсутствуют');
+          if (!savedSections) return initialSections;
+          const parsedSections = JSON.parse(savedSections);
+          return Array.isArray(parsedSections) ? parsedSections.map(s => typeof s === 'string' ? s : s.name || '') : initialSections;
+        } catch (e) {
+          console.error('Ошибка при загрузке участков из localStorage:', e);
+          return initialSections;
+        }
+      });
+      const [materials, setMaterials] = useState(() => {
+        try {
+          const savedMaterials = localStorage.getItem('materials');
+          console.log('Данные из localStorage (materials):', savedMaterials ? JSON.parse(savedMaterials) : 'Отсутствуют');
+          if (!savedMaterials) return initialMaterials;
+          const parsedMaterials = JSON.parse(savedMaterials);
+          return Array.isArray(parsedMaterials) ? parsedMaterials.map(m => typeof m === 'string' ? m : m.name || '') : initialMaterials;
+        } catch (e) {
+          console.error('Ошибка при загрузке материалов из localStorage:', e);
+          return initialMaterials;
+        }
+      });
+      const [activeTab, setActiveTab] = useState('tasks');
+      const [showModal, setShowModal] = useState(false);
+      const [editingTask, setEditingTask] = useState(null);
+      const [sortOrder, setSortOrder] = useState(() => {
+        const savedSortOrder = localStorage.getItem('sortOrder');
+        return savedSortOrder ? savedSortOrder : 'ascending';
+      });
+      const [materialFilter, setMaterialFilter] = useState(() => {
+        const savedMaterialFilter = localStorage.getItem('materialFilter');
+        return savedMaterialFilter ? savedMaterialFilter : '';
+      });
+      const [formData, setFormData] = useState({
+        date: '',
+        section: '',
+        description: '',
+        material: '',
+        count: '',
+        start_time: '08:00',
+        end_time: '17:00',
+        payment: '',
+        materials: [{ material: '', count: '', materialInputMode: 'select' }],
+        all_count: '',
+        newMaterial: '',
+        newSection: ''
+      });
+      const [exportButtonText, setExportButtonText] = useState('Экспортировать');
+      const chartRef = useRef(null);
+      const chartInstanceRef = useRef(null);
+
+      const DeleteButton = ({ classes, onDelete }) => {
+  const [isConfirming, setIsConfirming] = useState(false);
+  const buttonRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (buttonRef.current && !buttonRef.current.contains(e.target)) {
+        setIsConfirming(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleClick = () => {
+    if (isConfirming) {
+      onDelete();
+    } else {
+      setIsConfirming(true);
+    }
+  };
+
+  return (
+    <button
+      ref={buttonRef}
+      onClick={handleClick}
+      className={`${classes} ${isConfirming ? 'confirm-delete' : ''}`}
+    >
+      {isConfirming ? 'Удалить?' : 'Удалить'}
+    </button>
+  );
+};
+
+      const formatDateToInput = (dateStr) => {
+        if (!dateStr) return '';
+        try {
+          const [day, month] = dateStr.split(' ');
+          const monthIndex = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'].indexOf(month.toLowerCase());
+          if (monthIndex === -1) return '';
+          const year = new Date().getFullYear();
+          const monthNum = String(monthIndex + 1).padStart(2, '0');
+          const dayNum = String(parseInt(day)).padStart(2, '0');
+          return `${year}-${monthNum}-${dayNum}`;
+        } catch (e) {
+          console.error('Ошибка при преобразовании даты в формат input:', dateStr, e);
+          return '';
+        }
+      };
+
+      const formatDateToDisplay = (dateStr) => {
+        if (!dateStr) return 'Не указана';
+        try {
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return 'Не указана';
+          const day = date.getDate();
+          const monthIndex = date.getMonth();
+          const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+          return `${day} ${months[monthIndex]}`;
+        } catch (e) {
+          console.error('Ошибка при преобразовании даты в формат отображения:', dateStr, e);
+          return 'Не указана';
+        }
+      };
+
+      const updateMaterialsFromTasks = (tasksToScan) => {
+        const allMaterials = new Set(materials);
+        tasksToScan.forEach(task => {
+          if (task.material) {
+            allMaterials.add(task.material);
+          }
+          if (task.materials && Array.isArray(task.materials)) {
+            task.materials.forEach(mat => {
+              if (mat.material) {
+                allMaterials.add(mat.material);
+              }
+            });
+          }
+        });
+        const updatedMaterials = Array.from(allMaterials);
+        setMaterials(updatedMaterials);
+        console.log('Обновлен список материалов:', updatedMaterials);
+      };
+
+      useEffect(() => {
+        updateMaterialsFromTasks(tasks);
+      }, [tasks]);
+
+      useEffect(() => {
+  localStorage.setItem('tasks', JSON.stringify(tasks));
+  localStorage.setItem('sections', JSON.stringify(sections));
+  localStorage.setItem('materials', JSON.stringify(materials));
+  localStorage.setItem('materialPrices', JSON.stringify(materialPrices));
+  localStorage.setItem('sortOrder', sortOrder);
+  localStorage.setItem('materialFilter', materialFilter);
+}, [tasks, sections, materials, materialPrices, sortOrder, materialFilter]);
+
+    const buildChart = () => {
+  if (!chartRef.current || activeTab !== 'stats') return;
+
+  try {
+    // Уничтожаем предыдущий график, если он существует
+    if (chartInstanceRef.current) {
+      chartInstanceRef.current.destroy();
+    }
+
+    // Фильтруем задачи по выбранному диапазону дат
+    const paymentByDate = tasks
+      .filter(task => {
+        if (!task.date || !task.payment) return false;
+        const taskDateStr = formatDateToInput(task.date);
+        if (!taskDateStr) return false;
+        const taskDate = new Date(taskDateStr);
+        const start = new Date(dateRange.start);
+        const end = new Date(dateRange.end);
+        return taskDate >= start && taskDate <= end;
+      })
+      .map(task => ({
+        date: task.date,
+        payment: Number(task.payment) || 0,
+        taskDate: new Date(formatDateToInput(task.date))
+      }))
+      .sort((a, b) => a.taskDate - b.taskDate);
+
+    if (paymentByDate.length === 0) {
+      console.log('Нет данных для построения графика в выбранном диапазоне.');
+      const ctx = chartRef.current.getContext('2d');
+      ctx.font = '14px Inter';
+      ctx.fillStyle = '#64748b';
+      ctx.textAlign = 'center';
+      ctx.fillText('Нет данных для отображения графика.', chartRef.current.width / 2, chartRef.current.height / 2);
+      return;
+    }
+
+    const labels = paymentByDate.map(item => item.date);
+    const data = paymentByDate.map(item => item.payment);
+
+    const ctx = chartRef.current.getContext('2d');
+    chartInstanceRef.current = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          borderColor: '#a16ff7',
+          backgroundColor: 'rgba(161, 111, 247, 0.2)',
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            display: true,
+            title: {
+              display: true,
+              text: 'Дата',
+              font: { size: 14 },
+              color: '#64748b'
+            },
+            ticks: {
+              font: { size: 12 },
+              color: '#64748b'
+            }
+          },
+          y: {
+            display: true,
+            title: {
+              display: true,
+              text: 'Оплата (руб.)',
+              font: { size: 14 },
+              color: '#64748b'
+            },
+            ticks: {
+              font: { size: 12 },
+              color: '#64748b'
+            }
+          }
+        },
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+  } catch (e) {
+    console.error('Ошибка при построении графика:', e);
+  }
+};
+
+
+      useEffect(() => {
+  // Вызываем построение графика при:
+  // - изменении активной вкладки
+  // - изменении диапазона дат
+  if (activeTab === 'stats') {
+    buildChart();
+  }
+
+  // Очистка при размонтировании
+  return () => {
+    if (chartInstanceRef.current) {
+      chartInstanceRef.current.destroy();
+      chartInstanceRef.current = null;
+    }
+  };
+}, [activeTab]);
+
+
+      const openModal = (task = null) => {
+        console.log('Открытие модального окна...');
+        if (task) {
+          setEditingTask(task);
+          let materialsToEdit = [];
+          if (task.materials && Array.isArray(task.materials)) {
+            materialsToEdit = task.materials.map(m => ({
+              material: m.material || '',
+              count: m.count || '',
+              materialInputMode: materials.includes(m.material) ? 'select' : 'manual'
+            }));
+          } else if (task.material) {
+            materialsToEdit = [{
+              material: task.material || '',
+              count: task.count || '',
+              materialInputMode: materials.includes(task.material) ? 'select' : 'manual'
+            }];
+          } else {
+            materialsToEdit = [{ material: '', count: '', materialInputMode: 'select' }];
+          }
+
+          setFormData({
+            date: formatDateToInput(task.date),
+            section: task.section || '',
+            description: task.description || '',
+            material: task.material || '',
+            count: task.count || '',
+            start_time: task.start_time || '08:00',
+            end_time: task.end_time || '17:00',
+            payment: task.payment || '',
+            materials: materialsToEdit,
+            all_count: task.all_count || '',
+            newMaterial: '',
+            newSection: ''
+          });
+        } else {
+          setEditingTask(null);
+          setFormData({
+            date: '',
+            section: '',
+            description: '',
+            material: '',
+            count: '',
+            start_time: '08:00',
+            end_time: '17:00',
+            payment: '',
+            materials: [{ material: '', count: '', materialInputMode: 'select' }],
+            all_count: '',
+            newMaterial: '',
+            newSection: ''
+          });
+        }
+        setShowModal(true);
+      };
+
+      const closeModal = () => {
+        console.log('Закрытие модального окна...');
+        setShowModal(false);
+        setEditingTask(null);
+      };
+
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+      };
+
+      const handleMaterialChange = (index, e) => {
+        const { name, value } = e.target;
+        const newMaterials = [...formData.materials];
+        newMaterials[index][name] = value;
+        setFormData({ ...formData, materials: newMaterials });
+      };
+
+      const handleMaterialModeChange = (index, mode) => {
+        const newMaterials = [...formData.materials];
+        newMaterials[index].materialInputMode = mode;
+        if (mode === 'manual') {
+          newMaterials[index].material = '';
+        }
+        setFormData({ ...formData, materials: newMaterials });
+      };
+
+      const addMaterial = () => {
+        setFormData({ ...formData, materials: [...formData.materials, { material: '', count: '', materialInputMode: 'select' }] });
+      };
+
+      const removeMaterial = (index) => {
+        const newMaterials = formData.materials.filter((_, i) => i !== index);
+        setFormData({ ...formData, materials: newMaterials });
+      };
+
+      const textContains = (els, text) => {
+        return els.some(e => text.includes(e))
+      }
+
+      const handleSubmit = (e) => {
+  e.preventDefault();
+  try {
+    const start = new Date(`1970-01-01 ${formData.start_time}:00`);
+    const end = new Date(`1970-01-01 ${formData.end_time}:00`);
+    let workHours = (end - start) / (1000 * 60 * 60) - 1;
+    if (workHours < 0) workHours += 24;
+    if (isNaN(workHours)) workHours = 0;
+
+    const formattedDate = formatDateToDisplay(formData.date);
+    const totalMaterialCount = formData.materials.reduce((sum, m) => sum + (Number(m.count) || 0), 0);
+
+    // Автоматический расчет оплаты если не указана
+    let payment = formData.payment;
+
+    formData.materials.map((mat, i) => {
+        if (textContains(['*', '-', '+', '/'], mat.count)) {
+            formData.materials[i].count = round(calculate(mat.count), 2)
+       }
+    })
+
+    if (!payment && formData.materials.length > 0 && formData.section) {
+      let canCalculate = true;
+      payment = formData.materials.reduce((sum, m) => {
+        const sectionPrices = materialPrices[formData.section] || {};
+        const materialPrice = sectionPrices[m.material] || 0;
+        if (!materialPrice) canCalculate = false;
+        return sum + (Number(m.count) || 0) * materialPrice;
+      }, 0);
+      
+      if (!canCalculate) payment = ''; // Не все цены известны
+    }
+
+    const finalPayment = typeof formData.payment === 'number' 
+    ? formData.payment
+    : round(calculate(payment), 2) || 0;
+
+    const newTask = { 
+      ...formData, 
+      date: formattedDate, 
+      id: editingTask ? editingTask.id : Date.now(), 
+      work_time: workHours,
+      materials: formData.materials.map(m => ({
+        material: m.material,
+        count: m.count
+      })),
+      all_count: totalMaterialCount || formData.all_count,
+      payment: finalPayment || '' // Используем рассчитанное значение или оставляем пустым
+    };
+
+    if (editingTask) {
+      setTasks(tasks.map(t => t.id === editingTask.id ? newTask : t));
+    } else {
+      setTasks([...tasks, newTask]);
+    }
+    closeModal();
+  } catch (submitError) {
+    console.error('Ошибка при сохранении задачи:', submitError);
+  }
+};
+
+      const deleteTask = (id) => {
+        console.log('Удаление задачи с id:', id);
+        setTasks(tasks.filter(t => t.id !== id));
+      };
+
+      const handleExport = () => {
+  try {
+    const jsonString = JSON.stringify(tasks, null, 2);
+    
+    // Создаем имя файла с текущей датой
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '_'); // Формат YYYYMMDD
+    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '_'); // Формат HHMMSS
+    const fileName = `B${dateStr}__${timeStr}.json`;
+    
+    // Создаем blob и ссылку для скачивания
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error('Ошибка при экспорте данных:', e);
+  }
+};
+
+      const handleImport = () => {
+  // Создаем input для выбора файла
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = event => {
+      try {
+        const importedTasks = JSON.parse(event.target.result);
+        if (!Array.isArray(importedTasks)) {
+          throw new Error('Файл должен содержать массив задач');
+        }
+        
+        const newTasks = importedTasks.map(task => ({
+            ...task,
+            id: task.id || Date.now() + Math.random(),
+            date: task.date || 'Не указана',
+            section: task.section || 'Не указан',
+            description: task.description || '',
+            start_time: task.start_time || '08:00',
+            end_time: task.end_time || '17:00',
+            work_time: task.work_time || 8,
+            payment: task.payment || '',
+            materials: task.materials || (task.material ? [{ material: task.material, count: task.count || 0 }] : [{ material: '', count: '' }]),
+            all_count: task.all_count || (task.materials ? task.materials.reduce((sum, m) => sum + (Number(m.count) || 0), 0) : task.count || 0)
+          }));
+        
+        setTasks(newTasks);
+        console.log('Импорт успешен, загружено задач:', newTasks.length);
+      } catch (e) {
+        console.error('Ошибка при импорте файла:', e.message);
+        alert(`Ошибка: ${e.message}`);
+      }
+    };
+    reader.readAsText(file);
+  };
+  
+  input.click();
+};
+
+      const addSection = (newSection) => {
+        if (newSection && !sections.includes(newSection)) {
+          setSections([...sections, newSection]);
+        }
+      };
+
+      const removeSection = (sectionToRemove) => {
+        setSections(sections.filter(s => s !== sectionToRemove));
+        setTasks(tasks.map(task => task.section === sectionToRemove ? { ...task, section: '' } : task));
+      };
+
+      const addMaterialSetting = (newMaterial) => {
+        if (newMaterial && !materials.includes(newMaterial)) {
+          setMaterials([...materials, newMaterial]);
+        }
+      };
+
+      const removeMaterialSetting = (materialToRemove) => {
+        setMaterials(materials.filter(m => m !== materialToRemove));
+        setTasks(tasks.map(task => {
+          if (task.material === materialToRemove) return { ...task, material: '' };
+          if (task.materials) {
+            return { ...task, materials: task.materials.map(m => m.material === materialToRemove ? { ...m, material: '' } : m) };
+          }
+          return task;
+        }));
+      };
+
+      const sortTasksByDate = (tasksToSort) => {
+        return [...tasksToSort].sort((a, b) => {
+          const dateA = new Date(formatDateToInput(a.date));
+          const dateB = new Date(formatDateToInput(b.date));
+          return sortOrder === 'ascending' ? dateA - dateB : dateB - dateA;
+        });
+      };
+
+
+      const filterTasksByMaterial = (tasksToFilter) => {
+  if (!materialFilter) return tasksToFilter;
+  
+  // Приводим фильтр к нижнему регистру один раз для оптимизации
+  const filterLower = materialFilter.toLowerCase();
+  
+  return tasksToFilter.filter(task => {
+    const allMaterials = new Set();
+    
+    // Добавляем основной материал
+    if (task.material) allMaterials.add(task.material);
+    
+    // Добавляем материалы из массива
+    if (task.materials && Array.isArray(task.materials)) {
+      task.materials.forEach(m => {
+        if (m.material) allMaterials.add(m.material);
+      });
+    }
+    
+    // Проверяем частичное совпадение (без учета регистра)
+    return Array.from(allMaterials).some(m => 
+      m &&                          // Исключаем null/undefined
+      typeof m === 'string' &&      // Гарантируем что это строка
+      m.toLowerCase().includes(filterLower)
+    );
+  });
+};
+
+      const filteredAndSortedTasks = filterTasksByMaterial(sortTasksByDate(tasks));
+      
+      const toggleSortOrder = () => {
+        const newSortOrder = sortOrder === 'ascending' ? 'descending' : 'ascending';
+        setSortOrder(newSortOrder);
+      };
+
+      const resetFilters = () => {
+        setMaterialFilter('');
+        setSortOrder('ascending');
+      };
+
+const [dateRange, setDateRange] = useState(() => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  
+  // Если текущая дата меньше 25, берем предыдущий месяц
+  const startDate = now.getDate() < 25 ? 
+    new Date(currentYear, currentMonth - 1, 25) : 
+    new Date(currentYear, currentMonth, 25);
+  
+  // Если текущая дата меньше 25, берем текущий месяц 25
+  const endDate = now.getDate() < 25 ? 
+    new Date(currentYear, currentMonth, 25) : 
+    new Date(currentYear, currentMonth + 1, 25);
+  
+  return {
+    start: startDate.toISOString().split('T')[0],
+    end: endDate.toISOString().split('T')[0]
+  };
+});
+
+const handleDateRangeChange = (e) => {
+  const { name, value } = e.target;
+  setDateRange(prev => {
+    const newRange = { ...prev, [name]: value };
+    // Вызываем buildChart после обновления состояния
+    setTimeout(() => {
+       buildChart();
+    }, 50);
+    return newRange;
+  });
+}
+
+      const filteredTasks = tasks.filter(task => {
+          if (!task.date) return false;
+          const taskDateStr = formatDateToInput(task.date);
+          if (!taskDateStr) return false;
+          const taskDate = new Date(taskDateStr);
+          const start = new Date(dateRange.start);
+          const end = new Date(dateRange.end);
+          return taskDate >= start && taskDate <= end;
+      });
+
+      const calculate = (value) => {
+  try {
+    // Удаляем все кроме цифр, операторов и скобок
+    const sanitized = value.replace(/[^0-9+\-*/().]/g, '');
+    
+    // Запрещаем последовательные операторы
+    if (/[+\-*/]{2,}/.test(sanitized)) return value;
+    
+    // Ограничиваем длину выражения
+    if (sanitized.length > 30) return value;
+    
+    // Вычисляем только если последний символ - цифра или скобка
+    if (/[\d)]$/.test(sanitized)) {
+      // Используем Function вместо eval для безопасности
+      return new Function(`return ${sanitized}`)();
+    }
+    return value;
+  } catch {
+    return value;
+  }
+};
+
+      const totalTasks = tasks.length;
+      const startDate = new Date('2025-04-25');
+      const endDate = new Date('2025-05-25');
+      const NoPayment = tasks
+  .filter(task => task.payment == null || task.payment == 0)
+  .map(task => {
+      return {
+        date: task.date
+      };
+  })
+
+      const totalTask = tasks
+  .filter(task => task.date && task.payment)
+  .map(task => {
+    try {
+      const dateStr = formatDateToInput(task.date);
+      if (!dateStr) return null;
+      const taskDate = new Date(dateStr);
+      if (isNaN(taskDate.getTime())) return null;
+      return {
+        date: task.date,
+        payment: Number(task.payment) || 0,
+        taskDate: taskDate
+      };
+    } catch (e) {
+      console.error(`Ошибка при парсинге даты в задаче ${task.date}:`, e);
+      return null;
+    }
+  })
+  .filter(item => {
+    if (!item) return false;
+    const taskDate = item.taskDate;
+    const startDate = new Date(dateRange.start);
+    const endDate = new Date(dateRange.end);
+    return taskDate >= startDate && taskDate <= endDate;
+  })
+
+  const totalTaskCount = totalTask.length;
+  const totalPayment = totalTask.reduce((sum, item) => sum + item.payment, 0);
+
+
+  const [materialPrices, setMaterialPrices] = useState(() => {
+  try {
+    const savedPrices = localStorage.getItem('materialPrices');
+    return savedPrices ? JSON.parse(savedPrices) : {};
+  } catch (e) {
+    console.error('Ошибка при загрузке цен материалов:', e);
+    return {};
+  }
+});
+
+const materialStats = tasks
+  .filter(task => {
+    if (!task.date) return false;
+    const taskDateStr = formatDateToInput(task.date);
+    if (!taskDateStr) return false;
+    const taskDate = new Date(taskDateStr);
+    const start = new Date(dateRange.start);
+    const end = new Date(dateRange.end);
+    return taskDate >= start && taskDate <= end;
+  })
+  .reduce((acc, task) => {
+        try {
+          if (task.materials && Array.isArray(task.materials)) {
+            task.materials.forEach(mat => {
+              const materialName = mat.material;
+              const count = Number(mat.count) || 0;
+              if (materialName) {
+                acc[materialName] = (acc[materialName] || 0) + count;
+              }
+            });
+          } else if (task.material && task.count) {
+            const materialName = task.material;
+            const count = Number(task.count) || 0;
+            if (materialName) {
+              acc[materialName] = (acc[materialName] || 0) + count;
+            }
+          }
+          return acc;
+        } catch (e) {
+          console.error('Ошибка при обработке материалов в задаче:', task, e);
+          return acc;
+        }
+    }, {});
+
+      const materialStatsArray = Object.entries(materialStats).map(([material, count]) => {
+          // Находим цену материала по участкам
+          let price = 0;
+          for (const section in materialPrices) {
+            if (materialPrices[section][material]) {
+              price = materialPrices[section][material];
+              break;
+            }
+          }
+          return {
+            material,
+            count,
+            totalValue: count * price,
+            price
+          };
+        }).filter(item => item.count > 0);
+
+
+      const getBaseMaterialName = (fullName) => {
+  return fullName ? fullName.split(' ')[0] : 'Без названия';
+};
+
+// 2. Расчет статистики по базовым названиям
+const baseMaterialStats = tasks
+  .filter(task => {
+    if (!task.date) return false;
+    const taskDateStr = formatDateToInput(task.date);
+    if (!taskDateStr) return false;
+    const taskDate = new Date(taskDateStr);
+    const start = new Date(dateRange.start);
+    const end = new Date(dateRange.end);
+    return taskDate >= start && taskDate <= end;
+  })
+  .reduce((acc, task) => {
+    const processMaterials = (materials) => {
+      materials.forEach(mat => {
+        if (mat.material) {
+          const baseName = getBaseMaterialName(mat.material);
+          const count = Number(mat.count) || 0;
+          acc[baseName] = (acc[baseName] || 0) + count;
+        }
+      });
+    };
+
+    if (task.materials && Array.isArray(task.materials)) {
+      processMaterials(task.materials);
+    } else if (task.material) {
+      processMaterials([{material: task.material, count: task.count}]);
+    }
+    return acc;
+  }, {});
+
+const baseMaterialStatsArray = Object.entries(baseMaterialStats)
+  .map(([material, count]) => ({ material, count }))
+  .filter(item => item.count > 0)
+  .sort((a, b) => b.count - a.count);
+
+
+      return (
+        <div>
+          {activeTab === 'tasks' ? (
+            <>
+              <h1 className="mb-6">Управление задачами</h1>
+              <div className="filter-container">
+                <div className="filter-row">
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="form-label">Фильтр по материалу</label>
+                    <select
+                      value={materialFilter}
+                      onChange={(e) => setMaterialFilter(e.target.value)}
+                      className="form-select"
+                    >
+                      <option value="">Все материалы</option>
+                      {materials.map((material) => (
+                        <option key={material} value={material}>{material}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button onClick={toggleSortOrder} className="sort-button">
+                    {sortOrder === 'ascending' ? 'По убыванию дат' : 'По возрастанию дат'}
+                  </button>
+                  <button onClick={resetFilters} className="reset-button">
+                    Сбросить фильтры
+                  </button>
+                </div>
+              </div>
+              <div className="tasks-container">
+                {filteredAndSortedTasks.length === 0 ? (
+                  <p className="p-4 text-gray-500">Нет задач для отображения.</p>
+                ) : (
+                  filteredAndSortedTasks.map((task) => {
+                    const totalMaterialCount = task.all_count || (task.materials && Array.isArray(task.materials) 
+                      ? task.materials.reduce((sum, m) => sum + (Number(m.count) || 0), 0) 
+                      : task.count || 0);
+                    return (
+                      <div key={task.id} className="task-card">
+                        <div className="task-field">
+                          <span className="task-field-label">Дата:</span>
+                          <span className="task-field-value">{task.date || 'Не указана'}</span>
+                        </div>
+                        <div className="task-field">
+                          <span className="task-field-label">Участок:</span>
+                          <span className="task-field-value">{task.section || 'Не указан'}</span>
+                        </div>
+                        <div className="task-field description">
+                          <span className="task-field-label">Описание:</span>
+                          <span className="task-field-value description">{task.description || 'Не указано'}</span>
+                        </div>
+                        <div className="task-field materials_">
+                          <span className="task-field-label">Материалы:</span>
+                          <ul className="material-list task-field-value">
+                            {task.materials && Array.isArray(task.materials) ? (
+                              task.materials.map((mat, index) => (
+                                <li key={index} className="material-item">
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 222" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M215.771 151.107a7.111 7.111 0 0 0 3.57-6.144l.128-41.153a7.111 7.111 0 0 1 3.57-6.145l22.308-12.814A7.111 7.111 0 0 1 256 91.016v74.818a7.11 7.11 0 0 1-3.57 6.166l-84.19 48.357a7.111 7.111 0 0 1-7.07.007l-66.07-37.79a7.111 7.111 0 0 1-3.585-6.172v-37.726c0-.042.05-.07.093-.05c.035.022.085 0 .085-.05v-.042c0-.028.014-.057.043-.071l54.416-31.261c.05-.029.028-.107-.029-.107a.057.057 0 0 1-.057-.057l.107-36.986a7.111 7.111 0 0 0-10.667-6.187L95.064 87.17a7.111 7.111 0 0 1-7.097 0l-40.57-23.36a7.111 7.111 0 0 0-10.66 6.158v66.846a7.111 7.111 0 0 1-10.638 6.18L3.584 130.12A7.111 7.111 0 0 1 0 123.935L.2 7.095A7.111 7.111 0 0 1 10.851.946L87.974 45.24a7.111 7.111 0 0 0 7.083 0l77.1-44.296a7.111 7.111 0 0 1 10.653 6.172v116.867a7.111 7.111 0 0 1-3.562 6.166l-40.378 23.254a7.111 7.111 0 0 0 .028 12.338l22.273 12.68a7.111 7.111 0 0 0 7.061-.015l47.54-27.3Zm4.672-104.835a7.111 7.111 0 0 0 10.767 6.094l21.334-12.8A7.111 7.111 0 0 0 256 33.472V7.387A7.111 7.111 0 0 0 245.233 1.3L223.9 14.1a7.111 7.111 0 0 0-3.457 6.095v26.084v-.007Z"/>
+                                  </svg>
+                                  <div className="material-text">
+                                    <span className="material-name">{mat.material || 'Не указан'}</span>
+                                    <span className="material-count">
+                                      {mat.count || 0}
+                                      {materialPrices[task.section] && materialPrices[task.section][mat.material] ? ` × ${materialPrices[task.section][mat.material]} руб.` : ''}
+                                    </span>
+                                  </div>
+                                </li>
+                              ))
+                            ) : task.material ? (
+                              <li className="material-item">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                </svg>
+                                <div className="material-text">
+                                    <span className="material-name">{mat.material || 'Не указан'}</span>
+                                    <span className="material-count">
+                                      {mat.count || 0}
+                                    </span>
+                                </div>
+                              </li>
+                            ) : (
+                              <li className="material-item">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                </svg>
+                                <div className="material-text">
+                                    <span className="material-name">{mat.material || 'Не указан'}</span>
+                                    <span className="material-count">
+                                      {mat.count || 0}
+                                    </span>
+                                </div>
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                        <div className="task-field">
+                          <span className="task-field-label">Общее количество:</span>
+                          <span className="task-field-value">{totalMaterialCount}</span>
+                        </div>
+                        <div className="task-field">
+                          <span className="task-field-label">Время:</span>
+                          <span className="task-field-value">
+                            {`с ${task.start_time || '08:00'} до ${task.end_time || '17:00'} (${Math.round(task.work_time || ((new Date(`1970-01-01 ${task.end_time || '17:00'}:00`) - new Date(`1970-01-01 ${task.start_time || '09:00'}:00`)) / (1000 * 60 * 60) - 1))})`}
+                          </span>
+                        </div>
+                        <div className="task-field">
+                          <span className="task-field-label">Оплата (руб.):</span>
+                          <span className="task-field-value">{task.payment || 'Не указана'}</span>
+                        </div>
+                        <div className="action-buttons">
+                          <button onClick={() => openModal(task)} className="edit-button action-button">Редактировать</button>
+                          <DeleteButton 
+                            onDelete={() => deleteTask(task.id)}
+                            classes="delete-button action-button"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <button onClick={() => openModal()} className="add-button">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="w-6 h-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            </>
+          ) : activeTab === 'stats' ? (
+            <>
+              <h1 className="mb-6">Статистика</h1>
+              <div className="stats-container">
+                <p className="text-lg font-semibold">Общая информация</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 mb-4">
+                  <div className="p-4 bg-[#f5f0ff] rounded-lg">
+                    <p className="text-sm text-gray-600">Всего смен</p>
+                    <p className="text-xl font-bold text-[#6a3da8]">{totalTasks}</p>
+                  </div>
+                  <div className="p-4 bg-red-50 rounded-lg">
+                    <p className="text-sm text-gray-600">Смен без оплаты</p>
+                    <p className="text-xl font-bold text-red-700">{NoPayment.length}</p>
+                    <ul className="mt-2 flex w-full pt-2 justify-between flex-wrap items-center">
+                    {NoPayment.map((p) => (
+                        <li
+                          key={p.date}
+                          className="nopay-item text-sm justify-center flex-grow ml-2"
+                        >{p.date}</li>
+                    ))}
+                    </ul>
+                  </div>
+
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <p className="text-sm text-gray-600">Общая оплата за {totalTaskCount} смен</p>
+                    <p className="text-xl font-bold text-green-700">{totalPayment.toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="filter-container mb-4">
+                  <div className="filter-row">
+                  <div className="flex-1 min-w-[150px]">
+                    <label className="form-label">Дата начала</label>
+                    <input
+                      type="date"
+                      name="start"
+                      value={dateRange.start}
+                      onChange={handleDateRangeChange}
+                      className="form-input"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[150px]">
+                    <label className="form-label">Дата окончания</label>
+                    <input
+                      type="date"
+                      name="end"
+                      value={dateRange.end}
+                      onChange={handleDateRangeChange}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+              </div>
+              <table className="material-stats-table">
+  <thead>
+    <tr>
+      <th>Материал</th>
+      <th>Количество</th>
+      <th>Цена за ед.</th>
+      <th>Общая стоимость</th>
+    </tr>
+  </thead>
+  <tbody>
+    {materialStatsArray.map((stat, index) => (
+      <tr key={index}>
+        <td>{stat.material}</td>
+        <td>{stat.count}</td>
+        <td>{stat.price ? `${stat.price} руб.` : '—'}</td>
+        <td>{stat.totalValue ? `${stat.totalValue.toLocaleString()} руб.` : '—'}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+              <div className="mt-8">
+                  <p className="text-lg font-semibold mb-4">Сводка по типам материалов</p>
+                  <table className="material-stats-table">
+                    <thead>
+                      <tr>
+                        <th>Тип материала</th>
+                        <th>Общее количество</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {baseMaterialStatsArray.map((stat, index) => (
+                        <tr key={`base-${index}`}>
+                          <td>{stat.material}</td>
+                          <td>{stat.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="chart-container">
+                  <canvas ref={chartRef} className="chart-canvas"></canvas>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <h1 className="mb-6">Настройки</h1>
+              <div className="settings-container">
+                <div className="settings-buttons">
+  <button
+    onClick={handleExport}
+    className="submit-button w-full"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+    Экспорт в файл
+  </button>
+  
+  <button
+    onClick={handleImport}
+    className="submit-button w-full"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+    </svg>
+    Импорт из файла
+  </button>
+</div>
+                <p className="text-lg font-semibold mt-6">Управление материалами</p>
+                <div className="mb-4">
+                  <label className="form-label">Добавить материал</label>
+                  <input
+                    type="text"
+                    value={formData.newMaterial}
+                    onChange={(e) => setFormData({ ...formData, newMaterial: e.target.value })}
+                    className="form-input"
+                    placeholder="Новый материал"
+                  />
+                  <button
+                    onClick={() => { addMaterialSetting(formData.newMaterial); setFormData({ ...formData, newMaterial: '' }); }}
+                    className="material-add-button mt-2"
+                  >
+                    Добавить материал
+                  </button>
+                </div>
+                {materials.map((material) => (
+                  <div key={material} className="nopay-item flex justify-between items-center gap-2 mb-2">
+                    <span className="text-sm">{material}</span>
+                    <DeleteButton
+                      classes="material-remove-button"
+                      onDelete={() => removeMaterialSetting(material)}
+                    />
+                  </div>
+                ))}
+<p className="text-lg font-semibold mt-6">Цены материалов</p>
+<div className="mb-4">
+  <label className="form-label">Участок</label>
+  <select
+    value={formData.selectedSectionForPrice || ''}
+    onChange={(e) => setFormData({...formData, selectedSectionForPrice: e.target.value})}
+    className="form-input"
+  >
+    <option value="">Выберите участок</option>
+    {sections.map(section => (
+      <option key={section} value={section}>{section}</option>
+    ))}
+  </select>
+  <label className="form-label mt-2">Материал</label>
+  <select
+    value={formData.selectedMaterialForPrice || ''}
+    onChange={(e) => setFormData({...formData, selectedMaterialForPrice: e.target.value})}
+    className="form-input"
+  >
+    <option value="">Выберите материал</option>
+    {materials.map(material => (
+      <option key={material} value={material}>{material}</option>
+    ))}
+  </select>
+  <label className="form-label mt-2">Цена за единицу (руб.)</label>
+  <input
+    type="number"
+    value={formData.materialPriceValue || ''}
+    onChange={(e) => setFormData({...formData, materialPriceValue: e.target.value})}
+    className="form-input"
+    placeholder="Введите цену"
+  />
+  <button
+    onClick={() => {
+      if (formData.selectedSectionForPrice && formData.selectedMaterialForPrice && formData.materialPriceValue) {
+        const newPrices = {
+          ...materialPrices,
+          [formData.selectedSectionForPrice]: {
+            ...materialPrices[formData.selectedSectionForPrice],
+            [formData.selectedMaterialForPrice]: Number(formData.materialPriceValue)
+          }
+        };
+        setMaterialPrices(newPrices);
+        setFormData({...formData, materialPriceValue: '', selectedMaterialForPrice: '', selectedSectionForPrice: ''});
+      }
+    }}
+    className="material-add-button mt-2"
+  >
+    Установить цену
+  </button>
+</div>
+
+{Object.entries(materialPrices).map(([section, prices]) => (
+  <div key={`section-${section}`} className="mb-4">
+    {sections.includes(section) && (
+      <h3 className="font-semibold text-gray-700 mb-2">{section}</h3>
+    )}
+    {Object.entries(prices || {}).map(([material, price]) => (
+      <div key={`price-${section}-${material}`} className="flex nopay-item justify-between items-center gap-2 mb-2">
+        <span className="text-sm">{material}: {price} руб./ед.</span>
+        <DeleteButton
+            classes="material-remove-button"
+            onDelete={() => {
+            const newPrices = {...materialPrices};
+            if (newPrices[section]) {
+              delete newPrices[section][material];
+              if (Object.keys(newPrices[section]).length === 0) {
+                delete newPrices[section];
+              }
+            }
+            setMaterialPrices(newPrices);
+          }}
+        />
+      </div>
+    ))}
+  </div>
+))}
+                <p className="text-lg font-semibold mt-6">Управление участками</p>
+                <div className="mb-4">
+                  <label className="form-label">Добавить участок</label>
+                  <input
+                    type="text"
+                    value={formData.newSection}
+                    onChange={(e) => setFormData({ ...formData, newSection: e.target.value })}
+                    className="form-input"
+                    placeholder="Новый участок"
+                  />
+                  <button
+                    onClick={() => { addSection(formData.newSection); setFormData({ ...formData, newSection: '' }); }}
+                    className="material-add-button mt-2"
+                  >
+                    Добавить участок
+                  </button>
+                </div>
+                {sections.map((section) => (
+                  <div key={section} className="nopay-item flex justify-between items-center gap-2 mb-2">
+                    <span className="text-sm">{section}</span>
+                    <DeleteButton
+                        classes="material-remove-button"
+                        onDelete={() => {removeSection(section)}}
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {showModal && (
+            <div className="modal">
+              <div className="modal-content">
+                <button onClick={closeModal} className="close-button">×</button>
+                <h2 className="text-lg font-semibold mb-6">{editingTask ? 'Редактировать задачу' : 'Добавить задачу'}</h2>
+                <div>
+                  <div className="mb-4">
+                    <label className="form-label">Дата</label>
+                    <input
+                      type="date"
+                      name="date"
+                      value={formData.date}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      required
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label className="form-label">Участок</label>
+                    <select
+                      name="section"
+                      value={formData.section}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      required
+                    >
+                      <option value="">Выберите участок</option>
+                      {sections.map((section) => (
+                        <option key={section} value={section}>{section}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-4">
+                    <label className="form-label">Описание</label>
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      placeholder="Описание задачи"
+                      className="form-textarea"
+                    />
+                  </div>
+                  {formData.materials.map((mat, index) => (
+                    <div key={index} className="material-row">
+                      <div className="material-input">
+                        <label className="form-label">Материал</label>
+                        <div className="material-mode-toggle">
+                          <label>
+                            <input
+                              type="radio"
+                              name={`material-mode-${index}`}
+                              checked={mat.materialInputMode === 'select'}
+                              onChange={() => handleMaterialModeChange(index, 'select')}
+                            />
+                            Выбрать из списка
+                          </label>
+                          <label>
+                            <input
+                              type="radio"
+                              name={`material-mode-${index}`}
+                              checked={mat.materialInputMode === 'manual'}
+                              onChange={() => handleMaterialModeChange(index, 'manual')}
+                            />
+                            Ввести вручную
+                          </label>
+                        </div>
+                        {mat.materialInputMode === 'select' ? (
+                          <select
+                            name="material"
+                            value={mat.material}
+                            onChange={(e) => handleMaterialChange(index, e)}
+                            className="form-input"
+                            required
+                          >
+                            <option value="">Выберите материал</option>
+                            {materials.map((material) => (
+                              <option key={material} value={material}>{material}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            name="material"
+                            value={mat.material}
+                            onChange={(e) => handleMaterialChange(index, e)}
+                            placeholder="Введите материал"
+                            className="form-input"
+                            required
+                          />
+                        )}
+                      </div>
+                      <div className="material-input">
+                        <label className="form-label">Количество</label>
+                        <input
+                          type="text"
+                          name="count"
+                          value={mat.count}
+                          onChange={(e) => handleMaterialChange(index, e)}
+                          placeholder="Количество"
+                          className="form-input"
+                          required
+                        />
+                      </div>
+                      <button type="button" onClick={() => removeMaterial(index)} className="material-remove-button">
+                        Удалить
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={addMaterial} className="material-add-button">
+                    Добавить материал
+                  </button>
+                  <div className="mb-4">
+                    <label className="form-label">Начало смены</label>
+                    <input
+                      type="time"
+                      name="start_time"
+                      value={formData.start_time}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      required
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label className="form-label">Конец смены</label>
+                    <input
+                      type="time"
+                      name="end_time"
+                      value={formData.end_time}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      required
+                    />
+                  </div>
+                  <div className="mb-6">
+                    <label className="form-label">Оплата (руб.)</label>
+                    <input
+                      type="text"
+                      name="payment"
+                      value={formData.payment}
+                      onChange={handleInputChange}
+                      placeholder="Оплата"
+                      className="form-input"
+                    />
+                  </div>
+                  <button onClick={handleSubmit} className="submit-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    {editingTask ? 'Сохранить' : 'Добавить'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="nav-bar">
+            <a href="#" className={`nav-item ${activeTab === 'tasks' ? 'active' : ''}`} onClick={() => setActiveTab('tasks')}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012 2h2a2 2 0 012-2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+              Задачи
+            </a>
+            <a href="#" className={`nav-item ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Статистика
+            </a>
+            <a href="#" className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Настройки
+            </a>
+          </div>
+        </div>
+      );
+    }
+
+    const root = createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
