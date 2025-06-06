@@ -1120,7 +1120,7 @@
     formData.materials.map((mat, i) => {
         if (textContains(['*', '-', '+', '/'], mat.count)) {
             formData.materials[i].count = round(calculate(mat.count), 2)
-       }
+        }
     })
 
     if (!payment && formData.materials.length > 0 && formData.section) {
@@ -1148,7 +1148,7 @@
         material: m.material,
         count: m.count
       })),
-      all_count: totalMaterialCount || formData.all_count,
+      all_count: totalMaterialCount || '',
       payment: finalPayment || '' // Используем рассчитанное значение или оставляем пустым
     };
 
@@ -1620,7 +1620,9 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                         </div>
                         <div className="task-field">
                           <span className="task-field-label">Общее количество:</span>
-                          <span className="task-field-value">{totalMaterialCount}</span>
+                          <span className="task-field-value">
+                            {totalMaterialCount > 0 ? totalMaterialCount : 0}
+                          </span>
                         </div>
                         <div className="task-field">
                           <span className="task-field-label">Время:</span>
