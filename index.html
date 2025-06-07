@@ -890,10 +890,13 @@
   localStorage.setItem('tasks', JSON.stringify(tasks));
   localStorage.setItem('sections', JSON.stringify(sections));
   localStorage.setItem('materials', JSON.stringify(materials));
-  localStorage.setItem('materialPrices', JSON.stringify(materialPrices));
   localStorage.setItem('sortOrder', sortOrder);
   localStorage.setItem('materialFilter', materialFilter);
-}, [tasks, sections, materials, materialPrices, sortOrder, materialFilter]);
+}, [tasks, sections, materials, sortOrder, materialFilter]);
+
+useEffect(() => {
+  localStorage.setItem('materialPrices', JSON.stringify(materialPrices));
+}, [materialPrices]);
 
     const buildChart = () => {
   if (!chartRef.current || activeTab !== 'stats') return;
@@ -1133,6 +1136,7 @@
       }, 0);
       
       if (!canCalculate) payment = ''; // Не все цены известны
+      localStorage.setItem('materialPrices', JSON.stringify(materialPrices));
     }
 
     const finalPayment = typeof formData.payment === 'number' 
@@ -1831,22 +1835,26 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
     className="form-input"
     placeholder="Введите цену"
   />
-  <button
-    onClick={() => {
-      if (formData.selectedSectionForPrice && formData.selectedMaterialForPrice && formData.materialPriceValue) {
-        const newPrices = {
-          ...materialPrices,
-          [formData.selectedSectionForPrice]: {
-            ...materialPrices[formData.selectedSectionForPrice],
-            [formData.selectedMaterialForPrice]: Number(formData.materialPriceValue)
-          }
-        };
-        setMaterialPrices(newPrices);
-        setFormData({...formData, materialPriceValue: '', selectedMaterialForPrice: '', selectedSectionForPrice: ''});
-      }
-    }}
-    className="material-add-button mt-2"
-  >
+<button
+  onClick={() => {
+    if (formData.selectedSectionForPrice && formData.selectedMaterialForPrice && formData.materialPriceValue) {
+      const newPrices = {
+        ...materialPrices,
+        [formData.selectedSectionForPrice]: {
+          ...materialPrices[formData.selectedSectionForPrice],
+          [formData.selectedMaterialForPrice]: Number(formData.materialPriceValue)
+        }
+      };
+      setMaterialPrices(newPrices);
+      
+      // Сохраняем в localStorage сразу после обновления состояния
+      localStorage.setItem('materialPrices', JSON.stringify(newPrices));
+      
+      setFormData({...formData, materialPriceValue: '', selectedMaterialForPrice: '', selectedSectionForPrice: ''});
+    }
+  }}
+  className="material-add-button mt-2"
+>
     Установить цену
   </button>
 </div>
@@ -1859,19 +1867,25 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
     {Object.entries(prices || {}).map(([material, price]) => (
       <div key={`price-${section}-${material}`} className="flex nopay-item justify-between items-center gap-2 mb-2">
         <span className="text-sm">{material}: {price} руб./ед.</span>
-        <DeleteButton
-            classes="material-remove-button"
-            onDelete={() => {
-            const newPrices = {...materialPrices};
-            if (newPrices[section]) {
-              delete newPrices[section][material];
-              if (Object.keys(newPrices[section]).length === 0) {
-                delete newPrices[section];
-              }
-            }
-            setMaterialPrices(newPrices);
-          }}
-        />
+<DeleteButton
+  classes="material-remove-button"
+  onDelete={() => {
+    setMaterialPrices(prevPrices => {
+      const newPrices = {...prevPrices};
+      if (newPrices[section]) {
+        delete newPrices[section][material];
+        if (Object.keys(newPrices[section]).length === 0) {
+          delete newPrices[section];
+        }
+      }
+      
+      // Сохраняем обновленные цены
+      localStorage.setItem('materialPrices', JSON.stringify(newPrices));
+      
+      return newPrices;
+    });
+  }}
+/>
       </div>
     ))}
   </div>
