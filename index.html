@@ -836,7 +836,20 @@
         if (!dateStr) return '';
         try {
           const [day, month] = dateStr.split(' ');
-          const monthIndex = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'].indexOf(month.toLowerCase());
+          const monthIndex = [
+            'января',
+            'февраля',
+            'марта',
+            'апреля',
+            'мая',
+            'июня',
+            'июля',
+            'августа',
+            'сентября',
+            'октября',
+            'ноября',
+            'декабря'
+          ].indexOf(month.toLowerCase());
           if (monthIndex === -1) return '';
           const year = new Date().getFullYear();
           const monthNum = String(monthIndex + 1).padStart(2, '0');
@@ -1326,14 +1339,17 @@ const [dateRange, setDateRange] = useState(() => {
   
   // Если текущая дата меньше 25, берем предыдущий месяц
   const startDate = now.getDate() < 25 ? 
-    new Date(currentYear, currentMonth - 1, 25) : 
-    new Date(currentYear, currentMonth, 25);
+    new Date(currentYear, currentMonth - 1, 27) : 
+    new Date(currentYear, currentMonth, 27);
   
   // Если текущая дата меньше 25, берем текущий месяц 25
   const endDate = now.getDate() < 25 ? 
     new Date(currentYear, currentMonth, 25) : 
     new Date(currentYear, currentMonth + 1, 25);
   
+  console.log('start:', startDate.toISOString().split('T')[0])
+  console.log('end:', endDate.toISOString().split('T')[0])
+
   return {
     start: startDate.toISOString().split('T')[0],
     end: endDate.toISOString().split('T')[0]
