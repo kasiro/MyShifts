@@ -111,12 +111,12 @@
       font-size: 0.9rem;
       color: #1e293b;
       margin-bottom: 8px;
-      /* border: 4px solid #fff; */
+      /* border: 1.5px solid #fff; */
       box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.20);
     }
-    .material-item:hover {
-      background: #e2e8f0;
-    }
+    /* .material-item:hover { */
+    /*   background: #e2e8f0; */
+    /* } */
     .material-item svg {
       width: 18px;
       height: 18px;
@@ -228,10 +228,10 @@
     .edit-button {
       background: #10b981;
     }
-    .edit-button:hover {
-      background: #059669;
-      transform: translateY(-1px);
-    }
+    /* .edit-button:hover { */
+    /*   background: #059669; */
+    /*   transform: translateY(-1px); */
+    /* } */
     .delete-button {
       background: #ef4444;
       flex: 1;
@@ -314,10 +314,10 @@
       border: none;
       cursor: pointer;
     }
-    .material-add-button:hover {
-      background: #059669;
-      transform: translateY(-1px);
-    }
+    /* .material-add-button:hover { */
+    /*   background: #059669; */
+    /*   transform: translateY(-1px); */
+    /* } */
     .material-remove-button {
       padding: 8px 12px;
       border-radius: 8px;
@@ -449,10 +449,10 @@
     }
     .chart-container {
       margin-top: 20px;
-      padding: 16px;
+      /* padding: 16px; */
       background: #ffffff;
       border-radius: 12px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
     }
     .chart-canvas {
       min-height: 300px;
@@ -933,6 +933,7 @@ useEffect(() => {
       })
       .map(task => ({
         date: task.date,
+        section: task.section,
         payment: Number(task.payment) || 0,
         taskDate: new Date(formatDateToInput(task.date))
       }))
@@ -944,24 +945,27 @@ useEffect(() => {
       ctx.font = '14px Inter';
       ctx.fillStyle = '#64748b';
       ctx.textAlign = 'center';
-      ctx.fillText('Нет данных для отображения графика.', chartRef.current.width / 2, chartRef.current.height / 2);
+      ctx.fillText('Нет данных', chartRef.current.width / 2, chartRef.current.height / 2);
       return;
     }
 
-    const labels = paymentByDate.map(item => item.date);
+    const labels = paymentByDate.map(item => item.date + ` (${item.section})`);
     const data = paymentByDate.map(item => item.payment);
 
     const ctx = chartRef.current.getContext('2d');
     chartInstanceRef.current = new Chart(ctx, {
-      type: 'line',
+      // type: 'line',
+      type: 'bar',
       data: {
         labels: labels,
-        datasets: [{
-          data: data,
-          borderColor: '#a16ff7',
-          backgroundColor: 'rgba(161, 111, 247, 0.2)',
-          fill: true,
-        }]
+        datasets: [
+            {
+              data: data,
+              borderColor: '#a16ff7',
+              backgroundColor: 'rgba(161, 111, 247, 0.5)',
+              fill: true
+            }
+        ]
       },
       options: {
         responsive: true,
@@ -984,7 +988,7 @@ useEffect(() => {
             display: true,
             title: {
               display: true,
-              text: 'Оплата (руб.)',
+              text: 'Оплата',
               font: { size: 14 },
               color: '#64748b'
             },
