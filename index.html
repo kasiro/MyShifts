@@ -1119,8 +1119,8 @@ useEffect(() => {
       };
 
       const textContains = (els, text) => {
-        return els.some(e => text.includes(e))
-      }
+        return els.some((e) => text.includes(e));
+      };
 
       const handleSubmit = (e) => {
   e.preventDefault();
@@ -1131,17 +1131,19 @@ useEffect(() => {
     if (workHours < 0) workHours += 24;
     if (isNaN(workHours)) workHours = 0;
 
+    formData.materials.map((mat, i) => {
+        if (textContains(['*', '-', '+', '/'], String(mat.count))) {
+            formData.materials[i].count = round(calculate(mat.count), 2)
+            // console.log(mat.count, round(calculate(mat.count), 2))
+            // return formData.materials[i];
+        }
+    })
+
     const formattedDate = formatDateToDisplay(formData.date);
     const totalMaterialCount = formData.materials.reduce((sum, m) => sum + (Number(m.count) || 0), 0);
 
     // Автоматический расчет оплаты если не указана
     let payment = formData.payment;
-
-    formData.materials.map((mat, i) => {
-        if (textContains(['*', '-', '+', '/'], mat.count)) {
-            formData.materials[i].count = round(calculate(mat.count), 2)
-        }
-    })
 
     if (!payment && formData.materials.length > 0 && formData.section) {
       let canCalculate = true;
