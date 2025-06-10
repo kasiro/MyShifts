@@ -1193,20 +1193,13 @@ useEffect(() => {
 
       const handleExport = () => {
   try {
-    const exportData = {
-      tasks: tasks,
-      sections: sections,
-      materials: materials,
-      materialPrices: materialPrices
-    };
-    
-    const jsonString = JSON.stringify(exportData, null, 2);
+    const jsonString = JSON.stringify(tasks, null, 2);
     
     // Создаем имя файла с текущей датой
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '_'); // Формат YYYYMMDD
     const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '_'); // Формат HHMMSS
-    const fileName = `N${dateStr}__${timeStr}.json`;
+    const fileName = `B${dateStr}__${timeStr}.json`;
     
     // Создаем blob и ссылку для скачивания
     const blob = new Blob([jsonString], { type: 'application/json' });
@@ -1224,6 +1217,7 @@ useEffect(() => {
 };
 
       const handleImport = () => {
+  // Создаем input для выбора файла
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json';
@@ -1235,20 +1229,27 @@ useEffect(() => {
     const reader = new FileReader();
     reader.onload = event => {
       try {
-        const importedData = JSON.parse(event.target.result);
-        
-        // Проверяем наличие необходимых полей
-        if (!importedData.tasks || !Array.isArray(importedData.tasks)) {
+        const importedTasks = JSON.parse(event.target.result);
+        if (!Array.isArray(importedTasks)) {
           throw new Error('Файл должен содержать массив задач');
         }
         
-        // Обновляем все данные с заменой
-        setTasks(importedData.tasks);
-        setSections(importedData.sections || []);
-        setMaterials(importedData.materials || []);
-        setMaterialPrices(importedData.materialPrices || {});
+        const newTasks = importedTasks.map(task => ({
+            ...task,
+            id: task.id || Date.now() + Math.random(),
+            date: task.date || 'Не указана',
+            section: task.section || 'Не указан',
+            description: task.description || '',
+            start_time: task.start_time || '08:00',
+            end_time: task.end_time || '17:00',
+            work_time: task.work_time || 8,
+            payment: task.payment || '',
+            materials: task.materials || (task.material ? [{ material: task.material, count: task.count || 0 }] : [{ material: '', count: '' }]),
+            all_count: task.all_count || (task.materials ? task.materials.reduce((sum, m) => sum + (Number(m.count) || 0), 0) : task.count || 0)
+          }));
         
-        console.log('Импорт успешен');
+        setTasks(newTasks);
+        console.log('Импорт успешен, загружено задач:', newTasks.length);
       } catch (e) {
         console.error('Ошибка при импорте файла:', e.message);
         alert(`Ошибка: ${e.message}`);
@@ -1259,7 +1260,7 @@ useEffect(() => {
   
   input.click();
 };
-      
+
       const addSection = (newSection) => {
         if (newSection && !sections.includes(newSection)) {
           setSections([...sections, newSection]);
@@ -1600,7 +1601,10 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                         </div>
                         <div className="task-field materials_">
                           <span className="task-field-label">Материалы:</span>
-                          <ul className="material-list task-field-value">
+                          {task.materials.length == 0 ? (
+                             <span className="task-field-value flex justify-center">Не указано</span>
+                          ) : (
+                          <ul className=" material-list task-field-value">
                             {task.materials && Array.isArray(task.materials) ? (
                               task.materials.map((mat, index) => (
                                 <li key={index} className="material-item">
@@ -1642,6 +1646,7 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                               </li>
                             )}
                           </ul>
+                          )}
                         </div>
                         <div className="task-field">
                           <span className="task-field-label">Общее количество:</span>
@@ -1778,18 +1783,24 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
               <h1 className="mb-6">Настройки</h1>
               <div className="settings-container">
                 <div className="settings-buttons">
-  <button onClick={handleExport} className="submit-button w-full">
+  <button
+    onClick={handleExport}
+    className="submit-button w-full"
+  >
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
     </svg>
-    Экспорт данных
+    Экспорт в файл
   </button>
   
-  <button onClick={handleImport} className="submit-button w-full">
+  <button
+    onClick={handleImport}
+    className="submit-button w-full"
+  >
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
       <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
     </svg>
-    Импорт данных (замена)
+    Импорт из файла
   </button>
 </div>
                 <p className="text-lg font-semibold mt-6">Управление материалами</p>
