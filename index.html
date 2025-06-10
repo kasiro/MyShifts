@@ -623,6 +623,31 @@
       font-size: 1rem;
     }
   </style>
+  <style>
+.relative {
+  position: relative;
+}
+.absolute {
+  position: absolute;
+}
+.z-10 {
+  z-index: 10;
+}
+.max-h-60 {
+  max-height: 15rem;
+}
+.overflow-y-auto {
+  overflow-y: auto;
+}
+.rounded-r-none {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.rounded-r-md {
+  border-top-right-radius: 0.375rem;
+  border-bottom-right-radius: 0.375rem;
+}
+  </style>
 </head>
 <body>
   <div id="root"></div>
@@ -797,6 +822,7 @@
       const [exportButtonText, setExportButtonText] = useState('Экспортировать');
       const chartRef = useRef(null);
       const chartInstanceRef = useRef(null);
+      const [showMaterialSuggestions, setShowMaterialSuggestions] = useState(false);
 
       const DeleteButton = ({ classes, onDelete }) => {
   const [isConfirming, setIsConfirming] = useState(false);
@@ -1303,6 +1329,9 @@ useEffect(() => {
   
   // Приводим фильтр к нижнему регистру один раз для оптимизации
   const filterLower = materialFilter.toLowerCase();
+  if (materialFilter == 'Все материалы') {
+    setMaterialFilter('')
+  }
   
   return tasksToFilter.filter(task => {
     const allMaterials = new Set();
@@ -1543,6 +1572,55 @@ const baseMaterialStats = tasks
     return acc;
   }, {});
 
+const SelectChose = ({
+  placeholder_text,
+  List,
+  value,
+  onChange,
+  onSet = () => {}
+}) => {
+    const [show, setshow] = useState(false);
+
+    return (
+    <div className="relative">
+      <div className="flex flex-col">
+        <input
+          type="text"
+          readOnly={true}
+          value={value || ''}
+          onChange={onChange}
+          onFocus={() => setshow(true)}
+          onBlur={() => {
+            const int_ = setTimeout(() => {
+               setshow(false)
+            }, 50)
+            return () => clearInterval(int_)
+          }}
+          className="form-input rounded-md"
+          placeholder={placeholder_text}
+        />
+        {show && List.length > 0 && (
+        <div className="absolute mt-12 z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+          {List.map((element, index) => (
+            <div
+              key={index}
+              className="px-4 py-2 hover:bg-purple-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+              onClick={() => {
+                onSet(element);
+                setshow(false);
+              }}
+            >
+              <p>{element}</p>
+            </div>
+          ))}
+        </div>
+        )}
+      </div>
+    </div>
+    );
+}
+
+
 const baseMaterialStatsArray = Object.entries(baseMaterialStats)
   .map(([material, count]) => ({ material, count }))
   .filter(item => item.count > 0)
@@ -1558,16 +1636,13 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                 <div className="filter-row">
                   <div className="flex-1 min-w-[200px]">
                     <label className="form-label">Фильтр по материалу</label>
-                    <select
+                    <SelectChose
+                      placeholder_text="Все материалы"
+                      List={['Все материалы', ...materials]}
                       value={materialFilter}
                       onChange={(e) => setMaterialFilter(e.target.value)}
-                      className="form-select"
-                    >
-                      <option value="">Все материалы</option>
-                      {materials.map((material) => (
-                        <option key={material} value={material}>{material}</option>
-                      ))}
-                    </select>
+                      onSet={(v) => setMaterialFilter(v)}
+                    />
                   </div>
                   <button onClick={toggleSortOrder} className="sort-button">
                     {sortOrder === 'ascending' ? 'По убыванию дат' : 'По возрастанию дат'}
@@ -1661,7 +1736,7 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                           </span>
                         </div>
                         <div className="task-field">
-                          <span className="task-field-label">Оплата (руб.):</span>
+                          <span className="task-field-label">Оплата:</span>
                           <span className="task-field-value">{task.payment || 'Не указана'}</span>
                         </div>
                         <div className="action-buttons">
@@ -1803,57 +1878,53 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
     Импорт из файла
   </button>
 </div>
-                <p className="text-lg font-semibold mt-6">Управление материалами</p>
-                <div className="mb-4">
-                  <label className="form-label">Добавить материал</label>
-                  <input
-                    type="text"
-                    value={formData.newMaterial}
-                    onChange={(e) => setFormData({ ...formData, newMaterial: e.target.value })}
-                    className="form-input"
-                    placeholder="Новый материал"
-                  />
-                  <button
-                    onClick={() => { addMaterialSetting(formData.newMaterial); setFormData({ ...formData, newMaterial: '' }); }}
-                    className="material-add-button mt-2"
-                  >
-                    Добавить материал
-                  </button>
-                </div>
-                {materials.map((material) => (
-                  <div key={material} className="nopay-item flex justify-between items-center gap-2 mb-2">
-                    <span className="text-sm">{material}</span>
-                    <DeleteButton
-                      classes="material-remove-button"
-                      onDelete={() => removeMaterialSetting(material)}
-                    />
-                  </div>
-                ))}
+
+<p className="text-lg font-semibold mt-6">Управление материалами</p>
+    <div className="mb-4">
+      <label className="form-label">Добавить материал</label>
+              <input
+                type="text"
+                value={formData.newMaterial}
+                onChange={(e) => setFormData({ ...formData, newMaterial: e.target.value })}
+                className="form-input"
+                placeholder="Новый материал"
+              />
+              <button
+                onClick={() => { addMaterialSetting(formData.newMaterial); setFormData({ ...formData, newMaterial: '' }); }}
+                className="material-add-button mt-2"
+              >
+                Добавить материал
+              </button>
+            </div>
+            {materials.map((material) => (
+              <div key={material} className="nopay-item flex justify-between items-center gap-2 mb-2">
+                <span className="text-sm">{material}</span>
+                <DeleteButton
+                  classes="material-remove-button"
+                  onDelete={() => removeMaterialSetting(material)}
+                />
+              </div>
+            ))}
+
 <p className="text-lg font-semibold mt-6">Цены материалов</p>
 <div className="mb-4">
   <label className="form-label">Участок</label>
-  <select
-    value={formData.selectedSectionForPrice || ''}
-    onChange={(e) => setFormData({...formData, selectedSectionForPrice: e.target.value})}
-    className="form-input"
-  >
-    <option value="">Выберите участок</option>
-    {sections.map(section => (
-      <option key={section} value={section}>{section}</option>
-    ))}
-  </select>
+  <SelectChose
+      placeholder_text="Участок"
+      List={sections}
+      value={formData.selectedSectionForPrice}
+      onChange={(e) => setFormData({...formData, selectedSectionForPrice: e.target.value})}
+      onSet={(v) => setFormData({...formData, selectedSectionForPrice: v})}
+  />
   <label className="form-label mt-2">Материал</label>
-  <select
-    value={formData.selectedMaterialForPrice || ''}
-    onChange={(e) => setFormData({...formData, selectedMaterialForPrice: e.target.value})}
-    className="form-input"
-  >
-    <option value="">Выберите материал</option>
-    {materials.map(material => (
-      <option key={material} value={material}>{material}</option>
-    ))}
-  </select>
-  <label className="form-label mt-2">Цена за единицу (руб.)</label>
+  <SelectChose
+      placeholder_text="Материал"
+      List={materials}
+      value={formData.selectedMaterialForPrice || ''}
+      onChange={(e) => setFormData({...formData, selectedMaterialForPrice: e.target.value})}
+      onSet={(v) => setFormData({...formData, selectedMaterialForPrice: v})}
+  />
+    <label className="form-label mt-2">Цена за единицу</label>
   <input
     type="number"
     value={formData.materialPriceValue || ''}
@@ -1892,7 +1963,7 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
     )}
     {Object.entries(prices || {}).map(([material, price]) => (
       <div key={`price-${section}-${material}`} className="flex nopay-item justify-between items-center gap-2 mb-2">
-        <span className="text-sm">{material}: {price} руб./ед.</span>
+        <span className="text-sm">{material}: {price}/ед.</span>
 <DeleteButton
   classes="material-remove-button"
   onDelete={() => {
@@ -1964,18 +2035,13 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                   </div>
                   <div className="mb-4">
                     <label className="form-label">Участок</label>
-                    <select
-                      name="section"
+                    <SelectChose
+                      placeholder_text="Участок"
+                      List={sections}
                       value={formData.section}
                       onChange={handleInputChange}
-                      className="form-input"
-                      required
-                    >
-                      <option value="">Выберите участок</option>
-                      {sections.map((section) => (
-                        <option key={section} value={section}>{section}</option>
-                      ))}
-                    </select>
+                      onSet={(v) => setFormData({...formData, section: v})}
+                    />
                   </div>
                   <div className="mb-4">
                     <label className="form-label">Описание</label>
@@ -2012,18 +2078,16 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                           </label>
                         </div>
                         {mat.materialInputMode === 'select' ? (
-                          <select
-                            name="material"
-                            value={mat.material}
-                            onChange={(e) => handleMaterialChange(index, e)}
-                            className="form-input"
-                            required
-                          >
-                            <option value="">Выберите материал</option>
-                            {materials.map((material) => (
-                              <option key={material} value={material}>{material}</option>
-                            ))}
-                          </select>
+                        <SelectChose
+                          placeholder_text="Выберете Материал"
+                          List={materials}
+                          value={mat.material}
+                          onSet={(v) => {
+                              const newMaterials = [...formData.materials];
+                              newMaterials[index].material = v;
+                              setFormData({ ...formData, materials: newMaterials });
+                          }}
+                          />
                         ) : (
                           <input
                             type="text"
