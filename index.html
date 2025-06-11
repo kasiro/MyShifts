@@ -1994,11 +1994,13 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
             </div>
             {materials.map((material) => (
             <>
+            {/*
             <DropCategory
               title={material.split(' ')[0]}
               items={materials}
               onDelete={removeMaterialSetting}
             />
+            */}
               <div key={material} className="nopay-item flex justify-between items-center gap-2 mb-2">
                 <span className="text-sm">{material}</span>
                 <DeleteButton
