@@ -1302,8 +1302,7 @@ useEffect(() => {
   }
 };
 
-      const handleImport = () => {
-  // Создаем input для выбора файла
+const handleImport = () => {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json';
@@ -1315,27 +1314,20 @@ useEffect(() => {
     const reader = new FileReader();
     reader.onload = event => {
       try {
-        const importedTasks = JSON.parse(event.target.result);
-        if (!Array.isArray(importedTasks)) {
+        const importedData = JSON.parse(event.target.result);
+        
+        // Проверяем наличие необходимых полей
+        if (!importedData.tasks || !Array.isArray(importedData.tasks)) {
           throw new Error('Файл должен содержать массив задач');
         }
         
-        const newTasks = importedTasks.map(task => ({
-            ...task,
-            id: task.id || Date.now() + Math.random(),
-            date: task.date || 'Не указана',
-            section: task.section || 'Не указан',
-            description: task.description || '',
-            start_time: task.start_time || '08:00',
-            end_time: task.end_time || '17:00',
-            work_time: task.work_time || 8,
-            payment: task.payment || '',
-            materials: task.materials || (task.material ? [{ material: task.material, count: task.count || 0 }] : [{ material: '', count: '' }]),
-            all_count: task.all_count || (task.materials ? task.materials.reduce((sum, m) => sum + (Number(m.count) || 0), 0) : task.count || 0)
-          }));
+        // Обновляем все данные с заменой
+        setTasks(importedData.tasks);
+        setSections(importedData.sections || []);
+        setMaterials(importedData.materials || []);
+        setMaterialPrices(importedData.materialPrices || {});
         
-        setTasks(newTasks);
-        console.log('Импорт успешен, загружено задач:', newTasks.length);
+        console.log('Импорт успешен');
       } catch (e) {
         console.error('Ошибка при импорте файла:', e.message);
         alert(`Ошибка: ${e.message}`);
@@ -1346,7 +1338,7 @@ useEffect(() => {
   
   input.click();
 };
-
+      
       const addSection = (newSection) => {
         if (newSection && !sections.includes(newSection)) {
           setSections([...sections, newSection]);
