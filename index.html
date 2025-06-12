@@ -37,7 +37,6 @@
       gap: 16px;
       background: #f8fafc;
       border-radius: 12px;
-      padding: 16px;
       padding-bottom: 60px;
     }
     .task-card {
@@ -106,13 +105,13 @@
       gap: 8px;
       padding: 8px 12px;
       background: transparent;
-      /* background: #fff; */
+      background: #fff;
       border-radius: 6px;
       font-size: 0.9rem;
       color: #1e293b;
       margin-bottom: 8px;
-      /* border: 1.5px solid #fff; */
-      box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.20);
+      border: 1px solid #ccc;
+      /* box-shadow: 0 0 5px rgba(0, 0, 0, 0.20); */
     }
     /* .material-item:hover { */
     /*   background: #e2e8f0; */
@@ -167,8 +166,8 @@
       padding: 24px;
       border-radius: 12px;
       width: 90%;
-      max-width: 500px;
-      max-height: 80vh;
+      /* max-width: 500px; */
+      /* max-height: 80vh; */
       overflow-y: auto;
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
       position: relative;
@@ -227,6 +226,7 @@
     }
     .edit-button {
       background: #10b981;
+      flex: 1;
     }
     /* .edit-button:hover { */
     /*   background: #059669; */
@@ -536,6 +536,14 @@
       .task-card {
         padding: 12px;
         font-size: 0.85rem;
+      }
+      .modal-content {
+        max-width: 500px;
+        max-height: 80vh;
+      }
+      .nav-bar {
+        width: 96%;
+        margin-bottom: 10px;
       }
       .task-field {
         font-size: 0.85rem;
@@ -1853,6 +1861,50 @@ const DropCategory = ({
   );
 };
 
+const [presets, setPresets] = useState(() => {
+  try {
+    const savedPresets = localStorage.getItem('presets');
+    return savedPresets ? JSON.parse(savedPresets) : [];
+  } catch (e) {
+    console.error('Ошибка при загрузке пресетов:', e);
+    return [];
+  }
+});
+
+const [presetForm, setPresetForm] = useState({
+  section: '',
+  description: '',
+  materials: [{material: '', count: ''}],
+  start_time: '08:00',
+  end_time: '17:00',
+  payment: ''
+});
+
+useEffect(() => {
+  localStorage.setItem('presets', JSON.stringify(presets));
+}, [presets]);
+
+useEffect(() => {
+  if (showModal && formData.section) {
+    const preset = presets.find(p => p.section === formData.section);
+    if (preset) {
+      setFormData(prev => ({
+        ...prev,
+        description: preset.description || prev.description,
+        materials: preset.materials?.length > 0 
+          ? [...preset.materials] 
+          : prev.materials,
+        start_time: preset.start_time || prev.start_time,
+        end_time: preset.end_time || prev.end_time,
+        payment: preset.payment || prev.payment
+      }));
+    }
+  }
+}, [formData.section, showModal, presets]);
+
+console.log(presets, typeof presets)
+
+
 const baseMaterialStatsArray = Object.entries(baseMaterialStats)
   .map(([material, count]) => ({ material, count }))
   .filter(item => item.count > 0)
@@ -1972,7 +2024,12 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                           <span className="task-field-value">{task.payment || 'Не указана'}</span>
                         </div>
                         <div className="action-buttons">
-                          <button onClick={() => openModal(task)} className="edit-button action-button">Редактировать</button>
+                          <button 
+                            onClick={() => openModal(task)} 
+                            className="edit-button action-button"
+                          >
+                            Редактировать
+                          </button>
                           <DeleteButton 
                             onDelete={() => deleteTask(task.id)}
                             classes="delete-button action-button"
@@ -2244,6 +2301,155 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
     ))}
   </div>
 ))}
+
+<p className="text-lg font-semibold mt-6">Пресеты участков</p>
+<div className="mb-4">
+  <label className="form-label">Участок для пресета</label>
+  <SelectChose
+    placeholder_text="Выберите участок"
+    List={sections}
+    value={presetForm.section}
+    onSet={(v) => setPresetForm({...presetForm, section: v})}
+  />
+  
+  <label className="form-label mt-2">Описание</label>
+  <input
+    type="text"
+    value={presetForm.description}
+    onChange={(e) => setPresetForm({...presetForm, description: e.target.value})}
+    className="form-input"
+    placeholder="Описание (не обязательно)"
+  />
+  
+  {presetForm.materials.map((mat, index) => (
+    <div key={index} className="material-row mt-2">
+      <div className="material-input">
+        <label className="form-label">Материал</label>
+        <SelectChose
+          placeholder_text="Выберите материал"
+          List={materials}
+          value={mat.material}
+          onSet={(v) => {
+            const newMaterials = [...presetForm.materials];
+            newMaterials[index].material = v;
+            setPresetForm({...presetForm, materials: newMaterials});
+          }}
+        />
+      </div>
+      <div className="material-input">
+        <label className="form-label">Количество</label>
+        <input
+          type="text"
+          value={mat.count}
+          onChange={(e) => {
+            const newMaterials = [...presetForm.materials];
+            newMaterials[index].count = e.target.value;
+            setPresetForm({...presetForm, materials: newMaterials});
+          }}
+          placeholder="Количество"
+          className="form-input"
+        />
+      </div>
+      <button 
+        onClick={() => {
+          const newMaterials = presetForm.materials.filter((_, i) => i !== index);
+          setPresetForm({...presetForm, materials: newMaterials});
+        }}
+        className="material-remove-button"
+      >
+        Удалить
+      </button>
+    </div>
+  ))}
+  
+  <button 
+    onClick={() => setPresetForm({
+      ...presetForm, 
+      materials: [...presetForm.materials, {material: '', count: ''}]
+    })}
+    className="material-add-button mt-2"
+  >
+    Добавить материал
+  </button>
+  
+  <div className="grid grid-cols-2 gap-4 mt-4">
+    <div>
+      <label className="form-label">Начало смены</label>
+      <input
+        type="time"
+        value={presetForm.start_time}
+        onChange={(e) => setPresetForm({...presetForm, start_time: e.target.value})}
+        className="form-input"
+      />
+    </div>
+    <div>
+      <label className="form-label">Конец смены</label>
+      <input
+        type="time"
+        value={presetForm.end_time}
+        onChange={(e) => setPresetForm({...presetForm, end_time: e.target.value})}
+        className="form-input"
+      />
+    </div>
+  </div>
+  
+  <label className="form-label mt-2">Оплата</label>
+  <input
+    type="text"
+    value={presetForm.payment}
+    onChange={(e) => setPresetForm({...presetForm, payment: e.target.value})}
+    className="form-input"
+    placeholder="Оплата"
+  />
+  
+  <button
+    onClick={() => {
+      if (presetForm.section) {
+        const existingIndex = presets.findIndex(p => p.section === presetForm.section);
+        let newPresets;
+        if (existingIndex >= 0) {
+          newPresets = [...presets];
+          newPresets[existingIndex] = {...presetForm};
+        } else {
+          newPresets = [...presets, {...presetForm}];
+        }
+        
+        setPresets(newPresets);
+        setPresetForm({
+          section: '',
+          description: '',
+          materials: [{material: '', count: ''}],
+          start_time: '08:00',
+          end_time: '17:00',
+          payment: ''
+        });
+      }
+    }}
+    className="material-add-button mt-2"
+  >
+    {presets.some((p) => p.section === presetForm.section) ? 'Обновить пресет' : 'Сохранить пресет'}
+  </button>
+</div>
+
+<div className="mt-4">
+  {presets.map((preset, index) => (
+    <div key={index} className="nopay-item flex justify-between items-center gap-2 mb-2">
+      <div>
+        <p className="font-medium">{preset.section}</p>
+        {preset.description && <p className="text-sm">{preset.description}</p>}
+      </div>
+      <DeleteButton
+        classes="material-remove-button"
+        onDelete={() => {
+          const newPresets = [...presets];
+          newPresets.splice(index, 1);
+          setPresets(newPresets);
+        }}
+      />
+    </div>
+  ))}
+</div>
+
                 <p className="text-lg font-semibold mt-6">Управление участками</p>
                 <div className="mb-4">
                   <label className="form-label">Добавить участок</label>
@@ -2369,9 +2575,10 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                           required
                         />
                       </div>
-                      <button type="button" onClick={() => removeMaterial(index)} className="material-remove-button">
-                        Удалить
-                      </button>
+                      <DeleteButton
+                         classes="material-remove-button"
+                         onDelete={() => removeMaterial(index)} 
+                      />
                     </div>
                   ))}
                   <button type="button" onClick={addMaterial} className="material-add-button">
