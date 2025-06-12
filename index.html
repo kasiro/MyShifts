@@ -685,7 +685,7 @@
   border-radius: 4px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   /* z-index: 100; */
-  max-height: 300px;
+  /* max-height: 300px; */
   overflow-y: auto;
 }
 
@@ -701,6 +701,16 @@
   border-bottom: none;
 }
   </style>
+  <style>
+  .pie-chart-container {
+    margin-top: 30px;
+    padding: 16px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+    height: 400px;
+  }
+</style>
 </head>
 <body>
   <div id="root"></div>
@@ -1142,9 +1152,14 @@ useEffect(() => {
             newSection: ''
           });
         } else {
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          const TodayData = `${year}-${month}-${day}`;
           setEditingTask(null);
           setFormData({
-            date: '',
+            date: TodayData,
             section: '',
             description: '',
             material: '',
@@ -1326,6 +1341,11 @@ const handleImport = () => {
         setSections(importedData.sections || []);
         setMaterials(importedData.materials || []);
         setMaterialPrices(importedData.materialPrices || {});
+
+        localStorage.setItem('tasks', JSON.stringify(importedData.tasks));
+        localStorage.setItem('sections', JSON.stringify(importedData.sections));
+        localStorage.setItem('materials', JSON.stringify(importedData.materials));
+        localStorage.setItem('materialPrices', JSON.stringify(importedData.materialPrices));
         
         console.log('Импорт успешен');
       } catch (e) {
@@ -1537,6 +1557,108 @@ const handleDateRangeChange = (e) => {
     return {};
   }
 });
+
+const pieChartRef = useRef(null);
+  const pieChartInstanceRef = useRef(null);
+
+  // Функция для построения круговой диаграммы
+  const buildPieChart = () => {
+    if (!pieChartRef.current || activeTab !== 'stats') return;
+    
+    try {
+      // Уничтожаем предыдущий график
+      if (pieChartInstanceRef.current) {
+        pieChartInstanceRef.current.destroy();
+      }
+
+      // Группируем задачи по участкам
+      const sectionCounts = {};
+      filteredTasks.forEach(task => {
+        const section = task.section || 'Без участка';
+        sectionCounts[section] = (sectionCounts[section] || 0) + 1;
+      });
+
+      const sections = Object.keys(sectionCounts);
+      const counts = Object.values(sectionCounts);
+
+      if (sections.length === 0) {
+        const ctx = pieChartRef.current.getContext('2d');
+        ctx.font = '14px Inter';
+        ctx.fillStyle = '#64748b';
+        ctx.textAlign = 'center';
+        ctx.fillText('Нет данных', pieChartRef.current.width / 2, pieChartRef.current.height / 2);
+        return;
+      }
+
+      // Цвета для диаграммы
+      const backgroundColors = [
+        '#a16ff7', '#4c51bf', '#38b2ac', '#ed64a6', 
+        '#ecc94b', '#f56565', '#4299e1', '#48bb78', '#9f7aea'
+      ];
+
+      const ctx = pieChartRef.current.getContext('2d');
+      pieChartInstanceRef.current = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: sections,
+          datasets: [{
+            data: counts,
+            backgroundColor: backgroundColors,
+            borderColor: '#ffffff',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                font: {
+                  size: 12
+                }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const value = context.raw || 0;
+                  const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((value / total) * 100);
+                  const smen = value == 1 ? 'смена': (
+                    value > 1 && value <= 4 ? 'смены' : 'смен'
+                  );
+                  return `${value} ${smen} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    } catch (e) {
+      console.error('Ошибка при построении круговой диаграммы:', e);
+    }
+  };
+
+  // Обновим useEffect для перерисовки обеих диаграмм
+  useEffect(() => {
+    if (activeTab === 'stats') {
+      buildChart();
+      buildPieChart();
+    }
+
+    return () => {
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.destroy();
+        chartInstanceRef.current = null;
+      }
+      if (pieChartInstanceRef.current) {
+        pieChartInstanceRef.current.destroy();
+        pieChartInstanceRef.current = null;
+      }
+    };
+  }, [activeTab, dateRange]);
 
 const materialStats = tasks
   .filter(task => {
@@ -1960,6 +2082,9 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                 </div>
                 <div className="chart-container">
                   <canvas ref={chartRef} className="chart-canvas"></canvas>
+                </div>
+                <div className="pie-chart-container">
+                  <canvas ref={pieChartRef}></canvas>
                 </div>
               </div>
             </>
