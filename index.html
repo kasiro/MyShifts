@@ -1206,6 +1206,7 @@ useEffect(() => {
             {
               data: data,
               borderColor: accentColor,
+              borderRadius: 1.5,
               backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`,
               fill: true
             }
@@ -2375,6 +2376,7 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                   </div>
                 </div>
               </div>
+              { materialStatsArray.length > 0 && (
               <table className="material-stats-table">
   <thead>
     <tr>
@@ -2395,7 +2397,11 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
     ))}
   </tbody>
 </table>
+)}
+
               <div className="mt-8">
+                 { baseMaterialStatsArray.length > 0 && (
+                 <>
                   <p className="text-lg font-semibold mb-4">Сводка по типам материалов</p>
                   <table className="material-stats-table">
                     <thead>
@@ -2413,6 +2419,8 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
                       ))}
                     </tbody>
                   </table>
+                  </>
+                  )}
                 </div>
                 <div className="chart-container">
                   <canvas ref={chartRef} className="chart-canvas"></canvas>
