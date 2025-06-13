@@ -8,6 +8,13 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --accent-color: #a16ff7;
+      --accent-light: #c5a8ff;
+      --accent-dark: #7d4fd6;
+      --accent-10: rgba(161, 111, 247, 0.1);
+      --accent-20: rgba(161, 111, 247, 0.2);
+    }
     body {
       font-family: 'Inter', sans-serif;
       margin: 0;
@@ -92,7 +99,7 @@
       gap: 8px;
       padding: 8px 12px;
       background: #f1f5f9;
-      border-left: 4px solid #a16ff7;
+      border-left: 4px solid var(--accent-color);
       border-radius: 6px;
       font-size: 0.9rem;
       color: #1e293b;
@@ -119,7 +126,7 @@
     .material-item svg {
       width: 18px;
       height: 18px;
-      color: #a16ff7;
+      color: var(--accent-color);
       flex-shrink: 0;
     }
     .material-text {
@@ -135,8 +142,8 @@
       color: #1e293b;
     }
     .material-count {
-      background: #e0d1ff;
-      color: #6a3da8;
+      background: var(--accent-light);
+      color: var(--accent-dark);
       padding: 2px 8px;
       border-radius: 12px;
       font-size: 0.85rem;
@@ -199,12 +206,12 @@
       width: 64px;
       height: 64px;
       border-radius: 50%;
-      background: #a16ff7;
+      background: var(--accent-color);
       color: white;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 12px #a16ff7;
+      box-shadow: 0 0 12px var(--accent-color);
       transition: transform 1s ease, background-color 0.3s;
       padding: 12px;
       font-size: 1rem;
@@ -213,7 +220,7 @@
     .add-button:active {
       transform: scale(2);
       transition: transform 1s ease;
-      background: #8a5ce6;
+      background: var(--accent-dark);
     }
     .action-button {
       padding: 12px 20px;
@@ -282,7 +289,7 @@
     .form-select:focus {
       outline: none;
       border-color: #a16ff7;
-      box-shadow: 0 0 0 3px rgba(161, 111, 247, 0.1);
+      box-shadow: 0 0 0 3px var(--accent-10);
     }
     .form-label {
       display: block;
@@ -340,7 +347,7 @@
       gap: 8px;
       padding: 12px 20px;
       border-radius: 8px;
-      background: #a16ff7;
+      background: var(--accent-color);
       color: white;
       font-weight: 500;
       transition: background-color 0.2s, transform 0.2s;
@@ -350,7 +357,7 @@
       cursor: pointer;
     }
     /* .submit-button:hover { */
-    /*   background: #8a5ce6; */
+    /*   background: var(--accent-dark); */
     /*   transform: translateY(-1px); */
     /* } */
     .submit-button svg {
@@ -413,7 +420,7 @@
       margin-bottom: 4px;
     }
     .nav-item.active {
-      color: #a16ff7;
+      color: var(--accent-color);
       font-weight: bold;
       transform: scale(1.1) translate(0, -7%);
       transition: transform 0.3s;
@@ -482,11 +489,47 @@
       color: #64748b;
       cursor: pointer;
     }
-    .material-mode-toggle input[type="radio"] {
-      width: 16px;
-      height: 16px;
-      accent-color: #a16ff7;
-    }
+    /* Полный сброс стандартных стилей */
+input[type="radio"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #ccc; /* Цвет границы в невыбранном состоянии */
+  border-radius: 50%;
+  background: white; /* Фон всегда белый */
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+
+/* Состояние выбранной кнопки */
+input[type="radio"]:checked {
+  border-color: var(--accent-color); /* Цвет границы при выборе */
+  background: white; /* Явно задаем белый фон */
+}
+
+/* Внутренний кружок (индикатор выбора) */
+input[type="radio"]:checked::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: var(--accent-color); /* Цвет только для внутреннего кружка */
+  border-radius: 50%;
+}
+
+/* Состояние при фокусе */
+/* input[type="radio"]:focus { */
+/*   outline: none; */
+/*   box-shadow: 0 0 0 3px rgba(161, 111, 247, 0.3); */
+/* } */
     .filter-container {
       background: #ffffff;
       border-radius: 12px;
@@ -849,6 +892,92 @@
   });
 };
 
+const [accentColor, setAccentColor] = useState(() => {
+  const savedColor = localStorage.getItem('accentColor');
+  return savedColor || '#a16ff7';
+});
+
+// Функция для преобразования HEX в RGB
+const hexToRgb = (hex) => {
+  // Удаляем # если есть
+  hex = hex.replace('#', '');
+  
+  // Если короткая запись цвета (например, #abc), расширяем до полной (#aabbcc)
+  if (hex.length === 3) {
+    hex = hex.split('').map(c => c + c).join('');
+  }
+  
+  // Преобразуем в RGB
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  
+  return { r, g, b };
+};
+
+// Функция для преобразования RGB в HEX
+const rgbToHex = (r, g, b) => {
+  const toHex = (c) => {
+    const hex = c.toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+  
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
+
+// Функция для осветления цвета (amount от 0 до 1)
+const lightenColor = (hex, amount) => {
+  const { r, g, b } = hexToRgb(hex);
+  
+  const newR = Math.min(255, r + Math.round(255 * amount));
+  const newG = Math.min(255, g + Math.round(255 * amount));
+  const newB = Math.min(255, b + Math.round(255 * amount));
+  
+  return rgbToHex(newR, newG, newB);
+};
+
+// Функция для затемнения цвета (amount от 0 до 1)
+const darkenColor = (hex, amount) => {
+  const { r, g, b } = hexToRgb(hex);
+  
+  const newR = Math.max(0, r - Math.round(255 * amount));
+  const newG = Math.max(0, g - Math.round(255 * amount));
+  const newB = Math.max(0, b - Math.round(255 * amount));
+  
+  return rgbToHex(newR, newG, newB);
+};
+
+const updateAccentColors = (color) => {
+  // Преобразуем HEX в RGB для полупрозрачных вариантов
+  const rgb = hexToRgb(color);
+  const rgbString = `${rgb.r}, ${rgb.g}, ${rgb.b}`;
+  
+  // Обновляем CSS-переменные
+  document.documentElement.style.setProperty('--accent-color', color);
+  document.documentElement.style.setProperty('--accent-light', lightenColor(color, 0.2));
+  document.documentElement.style.setProperty('--accent-dark', darkenColor(color, 0.2));
+  document.documentElement.style.setProperty('--accent-10', `rgba(${rgbString}, 0.1)`);
+  document.documentElement.style.setProperty('--accent-20', `rgba(${rgbString}, 0.2)`);
+  
+  // Обновляем theme-color meta tag
+  const metaThemeColor = document.querySelector("meta[name=theme-color]");
+  if (metaThemeColor) {
+    metaThemeColor.setAttribute("content", color);
+  }
+};
+
+
+useEffect(() => {
+  localStorage.setItem('accentColor', accentColor);
+  updateAccentColors(accentColor);
+}, [accentColor]);
+
+// Инициализация при загрузке
+useEffect(() => {
+  updateAccentColors(accentColor);
+}, []);
+
+
       const [tasks, setTasks] = useState(() => {
         try {
           const savedTasks = localStorage.getItem('tasks');
@@ -1081,6 +1210,8 @@ useEffect(() => {
     const labels = paymentByDate.map(item => item.date + ` (${item.section})`);
     const data = paymentByDate.map(item => item.payment);
 
+    const rgb = hexToRgb(accentColor);
+
     const ctx = chartRef.current.getContext('2d');
     chartInstanceRef.current = new Chart(ctx, {
       // type: 'line',
@@ -1090,8 +1221,8 @@ useEffect(() => {
         datasets: [
             {
               data: data,
-              borderColor: '#a16ff7',
-              backgroundColor: 'rgba(161, 111, 247, 0.5)',
+              borderColor: accentColor,
+              backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`,
               fill: true
             }
         ]
@@ -1934,8 +2065,6 @@ useEffect(() => {
   }
 }, [formData.section, showModal, presets]);
 
-console.log(presets, typeof presets)
-
 
 const baseMaterialStatsArray = Object.entries(baseMaterialStats)
   .map(([material, count]) => ({ material, count }))
@@ -2089,9 +2218,9 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
               <div className="stats-container">
                 <p className="text-lg font-semibold">Общая информация</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 mb-4">
-                  <div className="p-4 bg-[#f5f0ff] rounded-lg">
+                  <div className="p-4 bg-[var(--accent-10)] rounded-lg">
                     <p className="text-sm text-gray-600">Всего смен</p>
-                    <p className="text-xl font-bold text-[#6a3da8]">{totalTasks}</p>
+                    <p className="text-xl font-bold text-[var(--accent-color)]">{totalTasks}</p>
                   </div>
                   <div className="p-4 bg-red-50 rounded-lg">
                     <p className="text-sm text-gray-600">Смен без оплаты</p>
@@ -2207,6 +2336,31 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
     Импорт из файла
   </button>
 </div>
+
+<p className="text-lg font-semibold mt-6">Основной цвет</p>
+<div className="flex items-center gap-4 mb-6">
+  <input 
+    type="color" 
+    value={accentColor}
+    onChange={(e) => setAccentColor(e.target.value)}
+    className="w-12 h-12 cursor-pointer"
+  />
+  <input
+    type="text"
+    value={accentColor}
+    onChange={(e) => setAccentColor(e.target.value)}
+    className="form-input flex-1"
+    placeholder="#a16ff7"
+  />
+  <button 
+    onClick={() => setAccentColor('#a16ff7')}
+    className="px-4 py-2 bg-gray-200 rounded-md"
+  >
+    Сбросить
+  </button>
+</div>
+
+
 
 <p className="text-lg font-semibold mt-6">Управление материалами</p>
     <div className="mb-4">
