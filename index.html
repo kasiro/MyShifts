@@ -1033,10 +1033,6 @@ useEffect(() => {
         const savedSortOrder = localStorage.getItem('sortOrder');
         return savedSortOrder ? savedSortOrder : 'ascending';
       });
-      const [materialFilter, setMaterialFilter] = useState(() => {
-        const savedMaterialFilter = localStorage.getItem('materialFilter');
-        return savedMaterialFilter ? savedMaterialFilter : '';
-      });
       const [formData, setFormData] = useState({
         date: '',
         section: '',
@@ -1051,7 +1047,6 @@ useEffect(() => {
         newMaterial: '',
         newSection: ''
       });
-      const [exportButtonText, setExportButtonText] = useState('Экспортировать');
       const chartRef = useRef(null);
       const chartInstanceRef = useRef(null);
       const [showMaterialSuggestions, setShowMaterialSuggestions] = useState(false);
@@ -1450,8 +1445,7 @@ useEffect(() => {
   localStorage.setItem('sections', JSON.stringify(sections));
   localStorage.setItem('materials', JSON.stringify(materials));
   localStorage.setItem('sortOrder', sortOrder);
-  localStorage.setItem('materialFilter', null);
-  localStorage.setItem('presets', presets);
+  localStorage.setItem('presets', JSON.stringify(presets));
   localStorage.setItem('accentColor', accentColor);
 }, [tasks, sections, materials, sortOrder, presets, accentColor]);
 
@@ -1526,7 +1520,7 @@ const handleImport = () => {
         localStorage.setItem('materials', JSON.stringify(importedData.materials));
         localStorage.setItem('materialPrices', JSON.stringify(importedData.materialPrices));
         localStorage.setItem('presets', JSON.stringify(importedData.presets));
-        localStorage.setItem('accentColor', JSON.stringify(importedData.presets));
+        localStorage.setItem('accentColor', accentColor);
         
         console.log('Импорт успешен');
       } catch (e) {
