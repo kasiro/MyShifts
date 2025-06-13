@@ -288,7 +288,7 @@
     .form-textarea:focus,
     .form-select:focus {
       outline: none;
-      border-color: var(--accent-color);
+      border-color: #a16ff7;
       box-shadow: 0 0 0 3px var(--accent-10);
     }
     .form-label {
@@ -1598,7 +1598,49 @@ const handleImport = () => {
   });
 };
 
-      const filteredAndSortedTasks = filterTasksByMaterial(sortTasksByDate(tasks));
+const [filters, setFilters] = useState({
+  section: '',
+  material: '',
+  minPayment: '',
+  maxPayment: '',
+  startDate: '',
+  endDate: ''
+});
+
+// 2. Модифицируем функцию фильтрации
+const filterTasks = (tasksToFilter) => {
+  return tasksToFilter.filter(task => {
+    // Фильтр по участку
+    if (filters.section && task.section !== filters.section) return false;
+    
+    // Фильтр по материалу
+    if (filters.material) {
+      const hasMaterial = task.materials?.some(m => m.material === filters.material) || 
+                         task.material === filters.material;
+      if (!hasMaterial) return false;
+    }
+    
+    // Фильтр по оплате
+    const payment = Number(task.payment) || 0;
+    if (filters.minPayment && payment < Number(filters.minPayment)) return false;
+    if (filters.maxPayment && payment > Number(filters.maxPayment)) return false;
+    
+    // Фильтр по дате
+    if (filters.startDate || filters.endDate) {
+      const taskDate = new Date(formatDateToInput(task.date));
+      const startDate = filters.startDate ? new Date(filters.startDate) : null;
+      const endDate = filters.endDate ? new Date(filters.endDate) : null;
+      
+      if (startDate && taskDate < startDate) return false;
+      if (endDate && taskDate > endDate) return false;
+    }
+    
+    return true;
+  });
+};
+
+
+      const filteredAndSortedTasks = filterTasks(sortTasksByDate(tasks));
       
       const toggleSortOrder = () => {
         const newSortOrder = sortOrder === 'ascending' ? 'descending' : 'ascending';
@@ -1646,6 +1688,7 @@ const handleDateRangeChange = (e) => {
   });
 }
 
+     
       const filteredTasks = tasks.filter(task => {
           if (!task.date) return false;
           const taskDateStr = formatDateToInput(task.date);
@@ -2078,25 +2121,116 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
             <>
               <h1 className="mb-6">Управление Сменами</h1>
               <div className="filter-container">
-                <div className="filter-row">
-                  <div className="flex-1 min-w-[200px]">
-                    <label className="form-label">Фильтр по материалу</label>
-                    <SelectChose
-                      placeholder_text="Все материалы"
-                      List={['Все материалы', ...materials]}
-                      value={materialFilter}
-                      onChange={(e) => setMaterialFilter(e.target.value)}
-                      onSet={(v) => setMaterialFilter(v)}
-                    />
-                  </div>
-                  <button onClick={toggleSortOrder} className="sort-button">
-                    {sortOrder === 'ascending' ? 'По убыванию дат' : 'По возрастанию дат'}
-                  </button>
-                  <button onClick={resetFilters} className="reset-button">
-                    Сбросить фильтры
-                  </button>
-                </div>
-              </div>
+  <div className="filter-row">
+    {/* Фильтр по участку */}
+    <div className="flex-1 min-w-[200px]">
+      <label className="form-label">Участок</label>
+      <select
+        value={filters.section}
+        onChange={(e) => setFilters({...filters, section: e.target.value})}
+        className="form-input"
+      >
+        <option value="">Все участки</option>
+        {sections.map(section => (
+          <option key={section} value={section}>{section}</option>
+        ))}
+      </select>
+    </div>
+    
+    {/* Новый фильтр по материалу */}
+    <div className="flex-1 min-w-[200px]">
+      <label className="form-label">Материал</label>
+      <select
+        value={filters.material}
+        onChange={(e) => setFilters({...filters, material: e.target.value})}
+        className="form-input"
+      >
+        <option value="">Все материалы</option>
+        {materials.map(material => (
+          <option key={material} value={material}>{material}</option>
+        ))}
+      </select>
+    </div>
+  </div>
+  
+  <div className="filter-row mt-4">
+    {/* Фильтр по оплате */}
+    <div className="flex-1 min-w-[200px]">
+      <label className="form-label">Оплата от</label>
+      <input
+        type="number"
+        value={filters.minPayment}
+        onChange={(e) => setFilters({...filters, minPayment: e.target.value})}
+        className="form-input"
+        placeholder="Минимум"
+      />
+    </div>
+    
+    <div className="flex-1 min-w-[200px]">
+      <label className="form-label">Оплата до</label>
+      <input
+        type="number"
+        value={filters.maxPayment}
+        onChange={(e) => setFilters({...filters, maxPayment: e.target.value})}
+        className="form-input"
+        placeholder="Максимум"
+      />
+    </div>
+  </div>
+  
+  <div className="filter-row mt-4">
+    {/* Фильтр по дате */}
+    <div className="flex-1 min-w-[200px]">
+      <label className="form-label">Дата с</label>
+      <input
+        type="date"
+        value={filters.startDate}
+        onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+        className="form-input"
+      />
+    </div>
+    
+    <div className="flex-1 min-w-[200px]">
+      <label className="form-label">Дата по</label>
+      <input
+        type="date"
+        value={filters.endDate}
+        onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+        className="form-input"
+      />
+    </div>
+ 
+    <button onClick={toggleSortOrder} className="sort-button">
+        {sortOrder === 'ascending' ? 'По убыванию дат' : 'По возрастанию дат'}
+    </button>
+
+
+    {/* Кнопка сброса */}
+    <button 
+      onClick={() => setFilters({
+        section: '',
+        material: '',
+        minPayment: '',
+        maxPayment: '',
+        startDate: '',
+        endDate: ''
+      })}
+      className="reset-button"
+    >
+      Сбросить все
+    </button>
+
+<div className="flex items-center gap-2 mt-4 p-2 bg-[var(--accent-10)] rounded-lg">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[var(--accent-color)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    </svg>
+    <span className="text-sm font-medium text-gray-700">
+      Всего смен: <span className="font-bold text-[var(--accent-color)]">{filteredAndSortedTasks.length}</span>
+    </span>
+  </div>
+
+  </div>
+</div>
               <div className="tasks-container">
                 {filteredAndSortedTasks.length === 0 ? (
                   <p className="p-4 text-gray-500">Нет задач для отображения.</p>
