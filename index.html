@@ -1157,18 +1157,7 @@ useEffect(() => {
         updateMaterialsFromTasks(tasks);
       }, [tasks]);
 
-      useEffect(() => {
-  localStorage.setItem('tasks', JSON.stringify(tasks));
-  localStorage.setItem('sections', JSON.stringify(sections));
-  localStorage.setItem('materials', JSON.stringify(materials));
-  localStorage.setItem('sortOrder', sortOrder);
-  localStorage.setItem('materialFilter', materialFilter);
-}, [tasks, sections, materials, sortOrder, materialFilter]);
-
-useEffect(() => {
-  localStorage.setItem('materialPrices', JSON.stringify(materialPrices));
-}, [materialPrices]);
-
+      
     const buildChart = () => {
   if (!chartRef.current || activeTab !== 'stats') return;
 
@@ -1456,13 +1445,30 @@ useEffect(() => {
         setTasks(tasks.filter(t => t.id !== id));
       };
 
+useEffect(() => {
+  localStorage.setItem('tasks', JSON.stringify(tasks));
+  localStorage.setItem('sections', JSON.stringify(sections));
+  localStorage.setItem('materials', JSON.stringify(materials));
+  localStorage.setItem('sortOrder', sortOrder);
+  localStorage.setItem('materialFilter', null);
+  localStorage.setItem('presets', presets);
+  localStorage.setItem('accentColor', accentColor);
+}, [tasks, sections, materials, sortOrder, presets, accentColor]);
+
+useEffect(() => {
+  localStorage.setItem('materialPrices', JSON.stringify(materialPrices));
+}, [materialPrices]);
+
+
       const handleExport = () => {
   try {
     const exportData = {
       tasks: tasks,
       sections: sections,
       materials: materials,
-      materialPrices: materialPrices
+      materialPrices: materialPrices,
+      presets: presets,
+      accentColor: accentColor
     };
     
     const jsonString = JSON.stringify(exportData, null, 2);
@@ -1512,11 +1518,15 @@ const handleImport = () => {
         setSections(importedData.sections || []);
         setMaterials(importedData.materials || []);
         setMaterialPrices(importedData.materialPrices || {});
+        setPresets(importedData.presets || {});
+        setAccentColor(importedData.accentColor || '#a16ff7')
 
         localStorage.setItem('tasks', JSON.stringify(importedData.tasks));
         localStorage.setItem('sections', JSON.stringify(importedData.sections));
         localStorage.setItem('materials', JSON.stringify(importedData.materials));
         localStorage.setItem('materialPrices', JSON.stringify(importedData.materialPrices));
+        localStorage.setItem('presets', JSON.stringify(importedData.presets));
+        localStorage.setItem('accentColor', JSON.stringify(importedData.presets));
         
         console.log('Импорт успешен');
       } catch (e) {
@@ -1567,37 +1577,6 @@ const handleImport = () => {
       };
 
 
-      const filterTasksByMaterial = (tasksToFilter) => {
-  if (!materialFilter) return tasksToFilter;
-  
-  // Приводим фильтр к нижнему регистру один раз для оптимизации
-  const filterLower = materialFilter.toLowerCase();
-  if (materialFilter == 'Все материалы') {
-    setMaterialFilter('')
-  }
-  
-  return tasksToFilter.filter(task => {
-    const allMaterials = new Set();
-    
-    // Добавляем основной материал
-    if (task.material) allMaterials.add(task.material);
-    
-    // Добавляем материалы из массива
-    if (task.materials && Array.isArray(task.materials)) {
-      task.materials.forEach(m => {
-        if (m.material) allMaterials.add(m.material);
-      });
-    }
-    
-    // Проверяем частичное совпадение (без учета регистра)
-    return Array.from(allMaterials).some(m => 
-      m &&                          // Исключаем null/undefined
-      typeof m === 'string' &&      // Гарантируем что это строка
-      m.toLowerCase().includes(filterLower)
-    );
-  });
-};
-
 const [filters, setFilters] = useState({
   section: '',
   material: '',
@@ -1615,8 +1594,12 @@ const filterTasks = (tasksToFilter) => {
     
     // Фильтр по материалу
     if (filters.material) {
-      const hasMaterial = task.materials?.some(m => m.material === filters.material) || 
-                         task.material === filters.material;
+      const hasMaterial = (task.materials?.some(m => m.material === filters.material) || (
+                         task.material === filters.material || (
+                           task.materials?.some(m => m.material.includes(filters.material))
+                         ))
+                         );
+
       if (!hasMaterial) return false;
     }
     
