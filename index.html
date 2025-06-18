@@ -1585,17 +1585,23 @@ const [filters, setFilters] = useState({
 const filterTasks = (tasksToFilter) => {
   return tasksToFilter.filter(task => {
     // Фильтр по участку
-    if (filters.section && task.section !== filters.section) return false;
+    if (filters.section === 'Все участки') {
+        
+    } else if (filters.section && task.section !== filters.section) return false;
     
     // Фильтр по материалу
     if (filters.material) {
-      const hasMaterial = (task.materials?.some(m => m.material === filters.material) || (
-                         task.material === filters.material || (
-                           task.materials?.some(m => m.material.includes(filters.material))
-                         ))
-                         );
+      if (filters.material === 'Все материалы') {
 
-      if (!hasMaterial) return false;
+      } else {
+          const hasMaterial = (task.materials?.some(m => m.material === filters.material) || (
+                             task.material === filters.material || (
+                               task.materials?.some(m => m.material.includes(filters.material))
+                             ))
+                             );
+
+          if (!hasMaterial) return false;
+      }
     }
     
     // Фильтр по оплате
@@ -2103,31 +2109,25 @@ const baseMaterialStatsArray = Object.entries(baseMaterialStats)
     {/* Фильтр по участку */}
     <div className="flex-1 min-w-[200px]">
       <label className="form-label">Участок</label>
-      <select
-        value={filters.section}
-        onChange={(e) => setFilters({...filters, section: e.target.value})}
-        className="form-input"
-      >
-        <option value="">Все участки</option>
-        {sections.map(section => (
-          <option key={section} value={section}>{section}</option>
-        ))}
-      </select>
+      <SelectChose
+          placeholder_text="Участок"
+          List={['Все участки', ...sections]}
+          value={filters.section}
+          onChange={(e) => setFilters({...filters, section: e.target.value})}
+          onSet={(v) => setFilters({...filters, section: v})}
+      />
     </div>
     
     {/* Новый фильтр по материалу */}
     <div className="flex-1 min-w-[200px]">
       <label className="form-label">Материал</label>
-      <select
-        value={filters.material}
-        onChange={(e) => setFilters({...filters, material: e.target.value})}
-        className="form-input"
-      >
-        <option value="">Все материалы</option>
-        {materials.map(material => (
-          <option key={material} value={material}>{material}</option>
-        ))}
-      </select>
+      <SelectChose
+          placeholder_text="Материал"
+          List={['Все материалы', ...materials]}
+          value={filters.material}
+          onChange={(e) => setFilters({...filters, material: e.target.value})}
+          onSet={(v) => setFilters({...filters, material: v})}
+      />
     </div>
   </div>
   
