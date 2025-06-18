@@ -2092,6 +2092,11 @@ useEffect(() => {
   }
 }, [formData.section, showModal, presets]);
 
+useEffect(() => {
+    window.scrollTo({
+        top: 760
+    });
+}, [])
 
 const baseMaterialStatsArray = Object.entries(baseMaterialStats)
   .map(([material, count]) => ({ material, count }))
