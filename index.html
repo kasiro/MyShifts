@@ -2075,7 +2075,7 @@ useEffect(() => {
 }, [presets]);
 
 useEffect(() => {
-  if (showModal && formData.section) {
+  if (showModal && formData.section && editingTask == null) {
     const preset = presets.find(p => p.section === formData.section);
     if (preset) {
       setFormData(prev => ({
