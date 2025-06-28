@@ -43,7 +43,7 @@
     <div id="root" class="min-h-screen"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
         const { createRoot } = ReactDOM;
         // Инициализация IndexedDB
         const initDB = () => {
@@ -128,6 +128,7 @@
         // Основной компонент приложения
         function App() {
             const [shifts, setShifts] = useState([]);
+            const [filteredShifts, setFilteredShifts] = useState([]);
             const [showShiftForm, setShowShiftForm] = useState(false);
             const [showAreaForm, setShowAreaForm] = useState(false);
             const [showAreaSettings, setShowAreaSettings] = useState(false);
@@ -136,6 +137,22 @@
             const [activeTab, setActiveTab] = useState('shifts');
             const [theme, setTheme] = useState('dark');
             const [savedAreas, setSavedAreas] = useState([]);
+            const [filters, setFilters] = useState({
+                sortOrder: 'desc', // 'asc' or 'desc'
+                areaName: '',
+                materialName: '',
+                minQuantity: '',
+                maxQuantity: '',
+                minSheets: '',
+                maxSheets: '',
+                minPayment: '',
+                maxPayment: '',
+                startDate: '',
+                endDate: ''
+            });
+            const [isFiltering, setIsFiltering] = useState(false);
+            const [isFilteringNow, setIsFilteringNow] = useState(false);
+            const filterTimeoutRef = useRef(null);
             
             // Загрузка данных и настроек при монтировании
             useEffect(() => {
@@ -148,7 +165,9 @@
                         const shiftsRequest = shiftsStore.getAll();
                         
                         shiftsRequest.onsuccess = () => {
-                            setShifts(shiftsRequest.result || []);
+                            const loadedShifts = shiftsRequest.result || [];
+                            setShifts(loadedShifts);
+                            setFilteredShifts(loadedShifts);
                         };
                         
                         // Загрузка темы
@@ -171,6 +190,174 @@
                 
                 loadData();
             }, []);
+            
+            // Применение фильтров при их изменении
+            useEffect(() => {
+                setIsFiltering(true);
+
+
+                
+                if (filterTimeoutRef.current) {
+                    clearTimeout(filterTimeoutRef.current);
+                }
+                
+                filterTimeoutRef.current = setTimeout(() => {
+                    applyFilters();
+                    setIsFiltering(false);
+                    const def_filters_desc = getResetFilters('desc');
+                    const def_filters_asc = getResetFilters('asc');
+                    if (filters != def_filters_asc || filters != def_filters_desc) {
+                        setIsFilteringNow(false);
+                    } else {
+                        setIsFilteringNow(true);
+                    }
+                }, 500); // 500 мс задержки
+                
+                return () => {
+                    if (filterTimeoutRef.current) {
+                        clearTimeout(filterTimeoutRef.current);
+                    }
+                };
+            }, [filters, shifts]);
+
+            // Функция применения фильтров
+            const applyFilters = () => {
+                let result = [...shifts];
+                
+                // Фильтрация по дате
+                if (filters.startDate || filters.endDate) {
+                    result = result.filter(shift => {
+                        const shiftDate = new Date(shift.date);
+                        const startDate = filters.startDate ? new Date(filters.startDate) : null;
+                        const endDate = filters.endDate ? new Date(filters.endDate) : null;
+                        
+                        let valid = true;
+                        if (startDate) valid = valid && shiftDate >= startDate;
+                        if (endDate) valid = valid && shiftDate <= endDate;
+                        return valid;
+                    });
+                }
+                
+                // Фильтрация по участку
+                if (filters.areaName) {
+                    result = result.filter(shift => {
+                        return shift.areas?.some(area => {
+                            return area.name.toLowerCase().includes(
+                                filters.areaName.toLowerCase()
+                            )
+                        });
+                    });
+                }
+                
+                // Фильтрация по материалу
+                if (filters.materialName) {
+                    result = result.filter(shift => {
+                        return shift.areas?.some(area => {
+                            return area.materials?.some(material => {
+                                return material.name.toLowerCase().includes(
+                                    filters.materialName.toLowerCase()
+                                );
+                            });
+                        });
+                    });
+                }
+                
+                // Фильтрация по количеству материала
+                if (filters.minQuantity || filters.maxQuantity) {
+                    result = result.filter(shift => {
+                        return shift.areas?.some(area => {
+                            return area.materials?.some(material => {
+                                const quantity = parseInt(material.quantity) || 0;
+                                let valid = true;
+                                if (filters.minQuantity) valid = valid && quantity >= parseInt(filters.minQuantity);
+                                if (filters.maxQuantity) valid = valid && quantity <= parseInt(filters.maxQuantity);
+                                return valid;
+                            })
+                        })
+                    })
+                }
+                
+                // Фильтрация по количеству листов
+                if (filters.minSheets || filters.maxSheets) {
+                    result = result.filter(shift => {
+                        return shift.areas?.some(area => {
+                            return area.materials?.some(material => {
+                                const sheets = parseInt(material.sheets) || 0;
+                                let valid = true;
+                                if (filters.minSheets) valid = valid && sheets >= parseInt(filters.minSheets);
+                                if (filters.maxSheets) valid = valid && sheets <= parseInt(filters.maxSheets);
+                                return valid;
+                            })
+                        })
+                    })
+                }
+                
+                // Фильтрация по оплате
+                if (filters.minPayment || filters.maxPayment) {
+                    result = result.filter(shift => {
+                        let totalPayment = shift.areas?.reduce((sum, area) => sum.payment + area.payment);
+                        if (typeof totalPayment === 'object') {
+                            totalPayment = totalPayment.payment;
+                        }
+                        let valid = true;
+                        if (filters.minPayment != '') {
+                            valid = valid && totalPayment >= Number(filters.minPayment);
+                        }
+                        if (filters.maxPayment != '') {
+                            valid = valid && totalPayment <= Number(filters.maxPayment);
+                        }
+                        return valid;
+                    });
+                }
+                
+                // Сортировка
+                result.sort((a, b) => {
+                    const dateA = new Date(a.date);
+                    const dateB = new Date(b.date);
+                    return filters.sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+                });
+                
+                setFilteredShifts(result);
+            };
+            
+            const handleFilterChange = (name, value) => {
+                setFilters(prev => ({
+                    ...prev,
+                    [name]: value
+                }));
+            };
+
+            const getResetFilters = (order) => {
+                return {
+                    sortOrder: order,
+                    areaName: '',
+                    materialName: '',
+                    minQuantity: '',
+                    maxQuantity: '',
+                    minSheets: '',
+                    maxSheets: '',
+                    minPayment: '',
+                    maxPayment: '',
+                    startDate: '',
+                    endDate: ''
+                };
+            };
+
+            const resetFilters = () => {
+                setFilters({
+                    sortOrder: 'desc',
+                    areaName: '',
+                    materialName: '',
+                    minQuantity: '',
+                    maxQuantity: '',
+                    minSheets: '',
+                    maxSheets: '',
+                    minPayment: '',
+                    maxPayment: '',
+                    startDate: '',
+                    endDate: ''
+                });
+            };
             
             // Сохранение смены
             const saveShift = async (shift) => {
@@ -203,7 +390,12 @@
             const addAreaToShift = async (shiftId, newArea) => {
                 const updatedShifts = shifts.map(shift => {
                     if (shift.id === shiftId) {
-                        const workHours = calculateWorkHours(newArea.startTime, newArea.endTime);
+                        const workHours = calculateWorkHours(
+                            newArea.startTime, 
+                            newArea.endTime, 
+                            shift.lunchStart || '12:00', 
+                            shift.lunchEnd || '13:00'
+                        );
                         return {
                             ...shift,
                             areas: [
@@ -364,7 +556,7 @@
                     <div className="mt-6">
                         {activeTab === 'shifts' && (
                             <ShiftsTab 
-                                shifts={shifts} 
+                                shifts={filteredShifts} 
                                 onAddShift={() => setShowShiftForm(true)}
                                 onAddArea={(shiftId) => {
                                     setCurrentShiftId(shiftId);
@@ -380,6 +572,11 @@
                                 onDeleteArea={deleteArea}
                                 theme={theme}
                                 savedAreas={savedAreas}
+                                filters={filters}
+                                onFilterChange={handleFilterChange}
+                                onResetFilters={resetFilters}
+                                isFiltering={isFiltering}
+                                isFilteringNow={isFilteringNow}
                             />
                         )}
                         {activeTab === 'stats' && <StatsTab shifts={shifts} theme={theme} />}
@@ -450,13 +647,42 @@
         }
         
         // Компонент вкладки "Мои смены"
-        function ShiftsTab({ shifts, onAddShift, onAddArea, onEditArea, onDeleteShift, onDeleteArea, theme, savedAreas }) {
+        function ShiftsTab({
+            shifts,
+            onAddShift,
+            onAddArea,
+            onEditArea,
+            onDeleteShift,
+            onDeleteArea,
+            theme,
+            savedAreas,
+            filters,
+            onFilterChange,
+            onResetFilters,
+            isFiltering,
+            isFilteringNow
+        }) {
             // Форматируем дату в dd.mm.yyyy
             const formatDate = (dateString) => {
                 if (!dateString) return '';
                 const [year, month, day] = dateString.split('-');
                 return `${day}.${month}.${year}`;
             };
+
+            const calculateTotals = (areas) => {
+                let totalQuantity = 0;
+                let totalSheets = 0;
+
+                areas?.forEach(area => {
+                    area.materials?.forEach(material => {
+                        totalQuantity += parseInt(material.quantity) || 0;
+                        totalSheets += parseInt(material.sheets) || 0;
+                    });
+                });
+
+                return { totalQuantity, totalSheets };
+            };
+
             return (
                 <div>
                     <div className="flex justify-between items-center mb-4">
@@ -470,120 +696,329 @@
                         </button>
                     </div>
                     
-                    {shifts.length === 0 ? (
-                        <div className="dark:bg-dark-800 bg-light-800 rounded-xl p-8 text-center">
-                            <i className="fas fa-calendar text-5xl mb-4 dark:text-gray-500 text-gray-400"></i>
-                            <h3 className="text-xl font-medium mb-2">Смены не добавлены</h3>
-                            <p className="dark:text-gray-500 text-gray-600 mb-4">Начните добавлять свои смены для отслеживания работы и материалов</p>
-                            <button 
-                                onClick={onAddShift}
-                                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
+                    {/* Панель фильтров */}
+                    <div className="dark:bg-dark-800 bg-light-800 rounded-xl p-4 mb-6 shadow">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {/* Сортировка */}
+                            <div>
+                                <label className="block text-sm font-medium mb-1">
+                                    <i className="fas fa-sort mr-2"></i>
+                                    Сортировка
+                                </label>
+                                <select
+                                    value={filters.sortOrder}
+                                    onChange={(e) => onFilterChange('sortOrder', e.target.value)}
+                                    className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                >
+                                    <option value="desc">Сначала новые</option>
+                                    <option value="asc">Сначала старые</option>
+                                </select>
+                            </div>
+                            
+                            {/* Фильтр по дате */}
+                            <div>
+                                <label className="block text-sm font-medium mb-1">
+                                    <i className="fas fa-calendar mr-2"></i>
+                                    Период
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                        type="date"
+                                        value={filters.startDate}
+                                        onChange={(e) => onFilterChange('startDate', e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                        placeholder="От"
+                                    />
+                                    <input
+                                        type="date"
+                                        value={filters.endDate}
+                                        onChange={(e) => onFilterChange('endDate', e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                        placeholder="До"
+                                    />
+                                </div>
+                            </div>
+                            
+                            {/* Фильтр по участку */}
+                            <div>
+                                <label className="block text-sm font-medium mb-1">
+                                    <i className="fas fa-map-marker-alt mr-2"></i>
+                                    Участок
+                                </label>
+                                <input
+                                    type="text"
+                                    value={filters.areaName}
+                                    onChange={(e) => onFilterChange('areaName', e.target.value)}
+                                    className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                    placeholder="Название участка"
+                                />
+                            </div>
+                            
+                            {/* Фильтр по материалу */}
+                            <div>
+                                <label className="block text-sm font-medium mb-1">
+                                    <i className="fas fa-boxes mr-2"></i>
+                                    Материал
+                                </label>
+                                <input
+                                    type="text"
+                                    value={filters.materialName}
+                                    onChange={(e) => onFilterChange('materialName', e.target.value)}
+                                    className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                    placeholder="Название материала"
+                                />
+                            </div>
+                            
+                            {/* Фильтр по количеству материала */}
+                            <div>
+                                <label className="block text-sm font-medium mb-1">
+                                    <i className="fas fa-hashtag mr-2"></i>
+                                    Количество материала
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                        type="number"
+                                        value={filters.minQuantity}
+                                        onChange={(e) => onFilterChange('minQuantity', e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                        placeholder="Мин"
+                                        min="0"
+                                    />
+                                    <input
+                                        type="number"
+                                        value={filters.maxQuantity}
+                                        onChange={(e) => onFilterChange('maxQuantity', e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                        placeholder="Макс"
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+                            
+                            {/* Фильтр по листам */}
+                            <div>
+                                <label className="block text-sm font-medium mb-1">
+                                    <i className="fas fa-layer-group mr-2"></i>
+                                    Листы
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                        type="number"
+                                        value={filters.minSheets}
+                                        onChange={(e) => onFilterChange('minSheets', e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                        placeholder="Мин"
+                                        min="0"
+                                    />
+                                    <input
+                                        type="number"
+                                        value={filters.maxSheets}
+                                        onChange={(e) => onFilterChange('maxSheets', e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                        placeholder="Макс"
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+                            
+                            {/* Фильтр по оплате */}
+                            <div>
+                                <label className="block text-sm font-medium mb-1">
+                                    <i className="fas fa-money-bill-wave mr-2"></i>
+                                    Оплата (₽)
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                        type="number"
+                                        value={filters.minPayment}
+                                        onChange={(e) => onFilterChange('minPayment', e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                        placeholder="Мин"
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                    <input
+                                        type="number"
+                                        value={filters.maxPayment}
+                                        onChange={(e) => onFilterChange('maxPayment', e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                        placeholder="Макс"
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex justify-end mt-4">
+                            <button
+                                onClick={onResetFilters}
+                                className="dark:bg-dark-700 bg-light-700 hover:dark:bg-dark-600 hover:bg-light-600 px-4 py-2 rounded-lg text-sm"
                             >
-                                Добавить первую смену
+                                <i className="fas fa-times mr-2"></i>
+                                Сбросить фильтры
                             </button>
                         </div>
+                    </div>
+                    
+                    {isFiltering ? (
+                        <div className="flex justify-center items-center py-12">
+                            <i className="fas fa-circle-notch fa-spin text-4xl text-primary-600"></i>
+                        </div>
+                    ) : shifts.length === 0 ? (
+                        <div className="dark:bg-dark-800 bg-light-800 rounded-xl p-8 text-center">
+                            <i className="fas fa-calendar text-5xl mb-4 dark:text-gray-500 text-gray-400"></i>
+                            <h3 className="text-xl font-medium mb-2">Смены не найдены</h3>
+                            <p className="dark:text-gray-500 text-gray-600 mb-4">Попробуйте изменить параметры фильтрации</p>
+                            {isFilteringNow && (
+                                <button 
+                                    onClick={onAddShift}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
+                                >
+                                    Добавить первую смену
+                                </button>
+                            )}
+                        </div>
                     ) : (
-                        <div className="space-y-6">
+                        <div className="space-y-4">
                             {shifts.map(shift => (
                                 <div key={shift.id} className="dark:bg-dark-800 bg-light-800 rounded-xl overflow-hidden shadow">
-                                    <div className="flex justify-between items-center p-6 border-b dark:border-dark-700 border-light-600">
+                                    <div className="flex justify-between items-center px-6 pt-6">
                                         <div>
                                             <h3 className="text-lg font-bold">{formatDate(shift.date)}</h3>
+                                                {shift.lunchStart && shift.lunchEnd && (
+                                                    <p className="text-sm dark:text-gray-500 text-gray-600 mt-1">
+                                                        Обед: {shift.lunchStart} - {shift.lunchEnd}
+                                                    </p>
+                                                )}
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <button 
-                                                onClick={() => onAddArea(shift.id)}
-                                                className="dark:bg-dark-700 bg-light-700 hover:dark:bg-dark-600 hover:bg-light-600 px-3 py-1 rounded-lg text-sm flex items-center"
+                                            <div className="flex items-center gap-3">
+                                                <button 
+                                                    onClick={() => onAddArea(shift.id)}
+                                                className="mr-2 dark:bg-primary bg-primary text-white px-4 py-2 rounded-lg text-sm flex items-center"
                                             >
-                                                <i className="fas fa-plus mr-1"></i>
+                                                <i className="fas fa-plus mr-2"></i>
                                                 Участок
                                             </button>
                                             <button 
                                                 onClick={() => onDeleteShift(shift.id)}
-                                                className="text-red-500 hover:text-red-400"
+                                                className="text-red-500"
                                             >
-                                                <i className="fas fa-trash"></i>
+                                                <i className="fas fa-times"></i>
                                             </button>
                                         </div>
                                     </div>
                                     
                                     {shift.areas?.length > 0 ? (
-                                        <div className="divide-y dark:divide-dark-700 divide-light-600">
-                                            {shift.areas.map((area, areaIndex) => (
-                                                <div key={areaIndex} className="p-6">
-                                                    <div className="flex justify-between items-start mb-4">
-                                                        <div>
-                                                            <h4 className="font-medium">{area.name}</h4>
-                                                            <p className="dark:text-gray-500 text-gray-600 text-sm">
-                                                                {area.startTime} - {area.endTime} ({area.workHours} ч)
-                                                            </p>
-                                                            {area.description && (
-                                                                <p className="dark:text-gray-500 text-gray-600 text-sm mt-1">
-                                                                    {area.description}
+                                        <div>
+                                            {shift.areas.map((area, areaIndex) => {
+                                                const areaTotals = calculateTotals([area]);
+                                                return (
+                                                    <div key={areaIndex} className="px-6 py-3">
+                                                        <div className="flex justify-between items-start mb-4">
+                                                            <div>
+                                                                <h4 className="font-medium">{area.name}</h4>
+                                                                <p className="dark:text-gray-500 text-gray-600 text-sm">
+                                                                    {area.startTime} - {area.endTime} ({area.workHours} ч)
                                                                 </p>
-                                                            )}
+                                                                {area.description && (
+                                                                    <p className="dark:text-gray-500 text-gray-600 text-sm mt-1">
+                                                                        {area.description}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="text-green-500 font-medium">{area.payment} ₽</div>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="text-green-500 font-medium">{area.payment} ₽</div>
+                                                        
+                                                        {area.materials?.length > 0 && (
+                                                            <>
+                                                                <div className="mt-4 w-full">
+                                                                    <h5 className="w-full text-sm font-medium dark:text-gray-500 text-gray-600 mb-2">
+                                                                        <i className="fas fa-boxes mr-1"></i>
+                                                                        Материалы:
+                                                                    </h5>
+                                                                    <div className="w-full dark:bg-dark-700 bg-light-700 rounded-lg p-3">
+                                                                        <div className="grid grid-cols-3 gap-2 text-sm font-medium dark:text-gray-400 text-gray-500 mb-2">
+                                                                            <div>Название</div>
+                                                                            <div>Количество</div>
+                                                                            <div>Листы</div>
+                                                                        </div>
+                                                                        {area.materials.map((material, matIndex) => (
+                                                                            <div key={matIndex} className="grid grid-cols-3 gap-5 py-1 border-b dark:border-dark-600 border-light-500 last:border-0">
+                                                                                <div>{material.name}</div>
+                                                                                <div>{material.quantity}</div>
+                                                                                <div>{material.sheets || '-'}</div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex justify-between mt-3 pt-2 border-t dark:border-dark-600 border-light-500">
+                                                                    <span className="text-sm font-medium dark:text-gray-400 text-gray-500">
+                                                                        Итого по участку:
+                                                                    </span>
+                                                                    <div className="flex gap-4">
+                                                                        <span className="text-sm">
+                                                                            <span className="dark:text-gray-400 text-gray-500">Кол-во: </span>
+                                                                            <span className="font-medium">{areaTotals.totalQuantity}</span>
+                                                                        </span>
+                                                                        <span className="text-sm">
+                                                                            <span className="dark:text-gray-400 text-gray-500">Листы: </span>
+                                                                            <span className="font-medium">{areaTotals.totalSheets}</span>
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                        
+                                                        <div className="flex justify-center mt-3 space-x-2">
                                                             <button 
                                                                 onClick={() => onEditArea(shift.id, areaIndex)}
-                                                                className="text-blue-500 hover:text-blue-400 ml-2"
+                                                                className="flex-1 text-md text-white px-5 py-2 bg-primary rounded-lg"
                                                             >
-                                                                <i className="fas fa-edit"></i>
+                                                                Редактировать
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => onDeleteArea(shift.id, areaIndex)}
+                                                                className="flex-1 text-sm px-5 py-2 bg-red-500 rounded-lg text-white"
+                                                            >
+                                                                Удалить
                                                             </button>
                                                         </div>
                                                     </div>
-                                                    
-                                                    {area.materials?.length > 0 && (
-                                                        <div className="mt-4">
-                                                            <h5 className="text-sm font-medium dark:text-gray-500 text-gray-600 mb-2">
-                                                                <i className="fas fa-boxes mr-1"></i>
-                                                                Материалы:
-                                                            </h5>
-                                                            <div className="dark:bg-dark-700 bg-light-700 rounded-lg p-3">
-                                                                <div className="grid grid-cols-3 gap-2 text-sm font-medium dark:text-gray-400 text-gray-500 mb-2">
-                                                                    <div>Название</div>
-                                                                    <div>Количество</div>
-                                                                    <div>Листы</div>
-                                                                </div>
-                                                                {area.materials.map((material, matIndex) => (
-                                                                    <div key={matIndex} className="grid grid-cols-3 gap-2 py-1 border-b dark:border-dark-600 border-light-500 last:border-0">
-                                                                        <div>{material.name}</div>
-                                                                        <div>{material.quantity}</div>
-                                                                        <div>{material.sheets || '-'}</div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
+                                                );
+                                            })}
+
+                                            {shift.areas?.length > 0 && (
+                                                <div className="p-4 dark:bg-dark-700 bg-light-700">
+                                                    <div className="flex flex-col font-medium">
+                                                        <span className="flex justify-between">
+                                                            <span>Итого за смену:</span>
+                                                            <span className="text-green-500">
+                                                                {shift.areas?.reduce((sum, area) => sum + area.payment, 0).toFixed(2)} ₽
+                                                            </span>
+                                                        </span>
+                                                        <div className="flex flex-col">
+                                                            <span className="flex justify-between">
+                                                                <span className="dark:text-gray-400 text-gray-600">Количество: </span>
+                                                                <span>{calculateTotals(shift.areas).totalQuantity}</span>
+                                                            </span>
+                                                            <span className="flex justify-between">
+                                                                <span className="dark:text-gray-400 text-gray-600">Листы: </span>
+                                                                <span>{calculateTotals(shift.areas).totalSheets}</span>
+                                                            </span>
                                                         </div>
-                                                    )}
-                                                    
-                                                    <div className="flex justify-end mt-3">
-                                                        <button 
-                                                            onClick={() => onDeleteArea(shift.id, areaIndex)}
-                                                            className="text-red-500 hover:text-red-400 text-sm"
-                                                        >
-                                                            <i className="fas fa-trash mr-1"></i>
-                                                            Удалить участок
-                                                        </button>
                                                     </div>
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="p-6 text-center dark:text-gray-500 text-gray-600">
                                             <i className="fas fa-map-marked-alt mr-1"></i>
                                             Участки не добавлены
                                         </div>
-                                    )}
-                                    
-                                    <div className="p-4 dark:bg-dark-700 bg-light-700 border-t dark:border-dark-600 border-light-500">
-                                        <div className="flex justify-between font-medium">
-                                            <span>Итого за смену:</span>
-                                            <span className="text-green-500">
-                                                {shift.areas?.reduce((sum, area) => sum + area.payment, 0).toFixed(2)} ₽
-                                            </span>
-                                        </div>
-                                    </div>
+                                    )}    
                                 </div>
                             ))}
                         </div>
@@ -595,18 +1030,31 @@
         // Компонент вкладки "Статистика"
         function StatsTab({ shifts, theme }) {
             // Расчет общей статистики
-            const totalStats = shifts.reduce((acc, shift) => {
+             const totalStats = shifts.reduce((acc, shift) => {
                 const shiftEarnings = shift.areas?.reduce((sum, area) => sum + area.payment, 0) || 0;
                 const shiftHours = shift.areas?.reduce((sum, area) => sum + parseFloat(area.workHours), 0) || 0;
-                
+        
                 return {
                     totalEarnings: acc.totalEarnings + shiftEarnings,
                     totalHours: acc.totalHours + shiftHours,
                     totalShifts: acc.totalShifts + 1,
-                    totalAreas: acc.totalAreas + (shift.areas?.length || 0)
+                    totalAreas: acc.totalAreas + (shift.areas?.length || 0),
+                    totalLunchHours: acc.totalLunchHours + (shift.areas?.length > 0 ? 1 : 0) // Учитываем 1 обед на смену
                 };
-            }, { totalEarnings: 0, totalHours: 0, totalShifts: 0, totalAreas: 0 });
-            
+            }, {
+                totalEarnings: 0,
+                totalHours: 0,
+                totalShifts: 0,
+                totalAreas: 0,
+                totalLunchHours: 0
+            });
+
+            const formatDate = (dateString) => {
+                if (!dateString) return '';
+                const [year, month, day] = dateString.split('-');
+                return `${day}.${month}.${year}`;
+            };
+
             return (
                 <div>
                     <h2 className="text-xl font-bold mb-6">Статистика</h2>
@@ -650,7 +1098,7 @@
                                         <div>
                                             <div className="font-medium">
                                                 <i className="fas fa-calendar-day mr-2"></i>
-                                                {shift.date}
+                                                {formatDate(shift.date)}
                                             </div>
                                             <div className="text-sm dark:text-gray-500 text-gray-600">
                                                 {shift.areas?.length || 0} участков, {shift.areas?.reduce((sum, area) => sum + parseFloat(area.workHours), 0).toFixed(2)} ч
@@ -726,10 +1174,6 @@
                                     <i className="fas fa-bell mr-2"></i>
                                     Уведомления
                                 </button>
-                                <button className="w-full text-left p-3 hover:dark:bg-dark-700 hover:bg-light-700 rounded-lg">
-                                    <i className="fas fa-shield-alt mr-2"></i>
-                                    Безопасность
-                                </button>
                             </div>
                         </div>
                         
@@ -754,10 +1198,6 @@
                                         <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[1.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 dark:border-gray-600 peer-checked:bg-primary-600"></div>
                                     </label>
                                 </div>
-                                <button className="w-full text-left p-3 hover:dark:bg-dark-700 hover:bg-light-700 rounded-lg">
-                                    <i className="fas fa-language mr-2"></i>
-                                    Язык
-                                </button>
                                 <button className="w-full text-left p-3 hover:dark:bg-dark-700 hover:bg-light-700 rounded-lg">
                                     <i className="fas fa-database mr-2"></i>
                                     Резервные копии
@@ -784,7 +1224,7 @@
                             
                             {showAreaSettings && (
                                 <div className="mt-4 space-y-4">
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-col gap-2">
                                         <input
                                             type="text"
                                             value={newAreaName}
@@ -796,26 +1236,24 @@
                                             onClick={handleAddArea}
                                             className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
                                         >
-                                            <i className="fas fa-plus"></i>
+                                            <i className="fas fa-plus mr-2"></i>
+                                            Добавить участок
                                         </button>
                                     </div>
                                     
                                     {savedAreas.length > 0 ? (
                                         <div className="dark:bg-dark-700 bg-light-700 rounded-lg p-3">
-                                            <div className="divide-y dark:divide-dark-600 divide-light-500">
+                                            <div>
                                                 {savedAreas.map((area) => (
-                                                    <div key={area.id} className="py-2 flex justify-between items-center">
+                                                    <div key={area.id} className="bg-primary dark:bg-primary mt-3 p-4 flex justify-between items-center rounded-lg">
                                                         <div>
-                                                            <div className="font-medium">{area.name}</div>
-                                                            {area.description && (
-                                                                <div className="text-sm dark:text-gray-500 text-gray-600">{area.description}</div>
-                                                            )}
+                                                            <div className="font-medium text-white">{area.name}</div>
                                                         </div>
                                                         <button
                                                             onClick={() => onDeleteSavedArea(area.id)}
-                                                            className="text-red-500 hover:text-red-400"
+                                                            className="text-red-500 hover:text-red-400 font-medium"
                                                         >
-                                                            <i className="fas fa-trash"></i>
+                                                            <i className="fas fa-times"></i>
                                                         </button>
                                                     </div>
                                                 ))}
@@ -838,11 +1276,15 @@
         // Компонент формы добавления смены
         function ShiftForm({ onAdd, onCancel, theme }) {
             const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-            
+            const [lunchStart, setLunchStart] = useState('12:00'); // По умолчанию обед с 12:00
+            const [lunchEnd, setLunchEnd] = useState('13:00');   // до 13:00
+
             const handleSubmit = (e) => {
                 e.preventDefault();
                 onAdd({
-                    date
+                    date,
+                    lunchStart,
+                    lunchEnd
                 });
             };
             
@@ -863,18 +1305,46 @@
                             <form onSubmit={handleSubmit}>
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium mb-1">
-                                            <i className="fas fa-calendar-day mr-2"></i>
-                                            Дата
-                                        </label>
-                                        <input 
-                                            type="date" 
-                                            value={date}
-                                            onChange={(e) => setDate(e.target.value)}
-                                            className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
-                                            required
-                                        />
-                                    </div>
+                                <label className="block text-sm font-medium mb-1">
+                                    <i className="fas fa-calendar-day mr-2"></i>
+                                    Дата
+                                </label>
+                                <input 
+                                    type="date" 
+                                    value={date}
+                                    onChange={(e) => setDate(e.target.value)}
+                                    className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                    required
+                                />
+                            </div>
+                            
+                            {/* Поля времени обеда */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">
+                                        <i className="fas fa-utensils mr-2"></i>
+                                        Обед с
+                                    </label>
+                                    <input 
+                                        type="time" 
+                                        value={lunchStart}
+                                        onChange={(e) => setLunchStart(e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">
+                                        <i className="fas fa-utensils mr-2"></i>
+                                        Обед до
+                                    </label>
+                                    <input 
+                                        type="time" 
+                                        value={lunchEnd}
+                                        onChange={(e) => setLunchEnd(e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                    />
+                                </div>
+                            </div>
                                     
                                     <div className="flex gap-3 pt-4">
                                         <button
@@ -906,8 +1376,6 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
     const isEditing = areaIndex !== null;
     const areaData = isEditing ? shift.areas[areaIndex] : null;
     
-    
-
     const [name, setName] = useState(areaData?.name || '');
     const [description, setDescription] = useState(areaData?.description || '');
     const [startTime, setStartTime] = useState(areaData?.startTime || '');
@@ -915,6 +1383,7 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
     const [payment, setPayment] = useState(areaData?.payment || '');
     const [materials, setMaterials] = useState(areaData?.materials || [{ name: '', quantity: '', sheets: '' }]);
     const [selectedAreaId, setSelectedAreaId] = useState('');
+    
 
     // При выборе сохраненного участка
     useEffect(() => {
@@ -926,6 +1395,28 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
             }
         }
     }, [selectedAreaId, savedAreas]);
+
+    const [totalQuantity, setTotalQuantity] = useState(0);
+    const [totalSheets, setTotalSheets] = useState(0);
+
+    // Функция для подсчёта итогов
+    const calculateTotals = (mats) => {
+        let qty = 0;
+        let sheets = 0;
+        
+        mats.forEach(material => {
+            qty += parseInt(material.quantity) || 0;
+            sheets += parseInt(material.sheets) || 0;
+        });
+        
+        setTotalQuantity(qty);
+        setTotalSheets(sheets);
+    };
+
+    // Вызываем подсчёт при изменении материалов
+    useEffect(() => {
+        calculateTotals(materials);
+    }, [materials]);
 
     const handleMaterialChange = (index, field, value) => {
         const newMaterials = [...materials];
@@ -1007,7 +1498,6 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
                                         className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
-                                        required
                                         placeholder="Например: Кровельные работы"
                                     />
                                 </div>
@@ -1040,9 +1530,6 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
                                         className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 pl-10 focus:outline-none focus:ring-1 focus:ring-primary-600"
                                         required
                                     />
-                                    <div className="absolute left-3 top-9 text-gray-500">
-                                        <i className="fas fa-clock"></i>
-                                    </div>
                                 </div>
                                 <div className="relative">
                                     <label className="block text-sm font-medium mb-1">
@@ -1056,9 +1543,6 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
                                         className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 pl-10 focus:outline-none focus:ring-1 focus:ring-primary-600"
                                         required
                                     />
-                                    <div className="absolute left-3 top-9 text-gray-500">
-                                        <i className="fas fa-clock"></i>
-                                    </div>
                                 </div>
                             </div>
                             
@@ -1070,9 +1554,15 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
                                 <input 
                                     type="number" 
                                     value={payment}
-                                    onChange={(e) => setPayment(e.target.value)}
+                                    onChange={(e) => {
+                                        const tp = e.target.value;
+                                        if (tp != 0) {
+                                            setPayment(tp);
+                                        } else {
+                                            setPayment('');
+                                        }
+                                    }}
                                     className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
-                                    required
                                 />
                             </div>
                             
@@ -1149,11 +1639,27 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
                                 </div>
                             </div>
                             
+                            <div className="mt-4 dark:bg-dark-700 bg-light-700 p-3 rounded-lg">
+                                <div className="flex justify-between">
+                                    <span className="font-medium">Итого:</span>
+                                    <div className="flex gap-4">
+                                        <span>
+                                            <span className="dark:text-gray-400 text-gray-600">Кол-во: </span>
+                                            <span className="font-bold">{totalQuantity}</span>
+                                        </span>
+                                        <span>
+                                            <span className="dark:text-gray-400 text-gray-600">Листы: </span>
+                                            <span className="font-bold">{totalSheets}</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="flex gap-3 pt-6">
                                 <button
                                     type="button"
                                     onClick={onCancel}
-                                    className="flex-1 dark:bg-dark-700 bg-light-700 hover:dark:bg-dark-600 hover:bg-light-600 py-3 rounded-lg flex items-center justify-center"
+                                    className="flex-1 dark:bg-dark-600 bg-light-600 hover:dark:bg-dark-600 hover:bg-light-600 py-3 rounded-lg flex items-center justify-center"
                                 >
                                     <i className="fas fa-times mr-2"></i>
                                     Отмена
@@ -1163,7 +1669,7 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
                                     className="flex-1 bg-primary-600 hover:bg-primary-700 py-3 rounded-lg flex items-center justify-center text-white"
                                 >
                                     <i className="fas fa-check mr-2"></i>
-                                    {isEditing ? 'Сохранить изменения' : 'Сохранить участок'}
+                                    Сохранить
                                 </button>
                             </div>
                         </div>
@@ -1174,24 +1680,29 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
     );
 }
         
-        // Функция для расчета времени работы (с вычетом 1 часа на обед)
-        const calculateWorkHours = (startTime, endTime) => {
+        const calculateWorkHours = (startTime, endTime, lunchStart, lunchEnd) => {
             if (!startTime || !endTime) return 0;
             
             const start = new Date(`2000-01-01T${startTime}`);
             const end = new Date(`2000-01-01T${endTime}`);
+            const lunchS = new Date(`2000-01-01T${lunchStart}`);
+            const lunchE = new Date(`2000-01-01T${lunchEnd}`);
             
-            // Если время конца меньше времени начала, значит это ночная смена
-            if (end < start) {
-                end.setDate(end.getDate() + 1);
+            // Корректировка если смена переходит через полночь
+            if (end < start) end.setDate(end.getDate() + 1);
+            if (lunchE < lunchS) lunchE.setDate(lunchE.getDate() + 1);
+            
+            let totalMs = end - start;
+            
+            // Проверяем пересекается ли время работы с обедом
+            if (start < lunchE && end > lunchS) {
+                const overlapStart = new Date(Math.max(start, lunchS));
+                const overlapEnd = new Date(Math.min(end, lunchE));
+                const lunchDuration = overlapEnd - overlapStart;
+                totalMs -= Math.max(0, lunchDuration);
             }
             
-            const diffMs = end - start;
-            const hours = (diffMs / (1000 * 60 * 60));
-            
-            // Вычитаем 1 час на обед (но не меньше 0)
-            const workHours = Math.max(hours - 1, 0);
-            return workHours.toFixed(2);
+            return (totalMs / (1000 * 60 * 60)).toFixed(2);
         };
         
         // Рендерим приложение
