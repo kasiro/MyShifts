@@ -48,10 +48,11 @@
         // Инициализация IndexedDB
         const initDB = () => {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open('WorkShiftDB', 3);
+                const request = indexedDB.open('WorkShiftDB', 4);
                 
                 request.onupgradeneeded = (event) => {
                     const db = event.target.result;
+
                     if (!db.objectStoreNames.contains('shifts')) {
                         db.createObjectStore('shifts', { keyPath: 'id' });
                     }
@@ -60,6 +61,9 @@
                     }
                     if (!db.objectStoreNames.contains('areas')) {
                         db.createObjectStore('areas', { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains('materials')) {
+                        db.createObjectStore('materials', { keyPath: 'id' });
                     }
                 };
                 
@@ -72,12 +76,26 @@
                 };
             });
         };
+        
+        const formatHoursToHMM = (hours) => {
+            const totalMinutes = Math.round(hours * 60);
+            const h = Math.floor(totalMinutes / 60);
+            const m = totalMinutes % 60;
+            const min_ = m.toString().padStart(2, '0');
+            if (min_ == '00') {
+                return `${h} ч`;
+            }
+            return `${h} ч, ${min_} м`;
+        };
 
         // Сохранение данных в IndexedDB
         const saveData = async (storeName, data) => {
             const db = await initDB();
             return new Promise((resolve, reject) => {
                 const transaction = db.transaction(storeName, 'readwrite');
+                transaction.onerror = (event) => {
+                    reject(`Transaction error: ${event.target.error}`);
+                };
                 const store = transaction.objectStore(storeName);
                 const request = store.put(data);
                 
@@ -94,7 +112,7 @@
                 const store = transaction.objectStore(storeName);
                 const request = store.get(id);
                 
-                request.onsuccess = () => resolve(request.result?.value);
+                request.onsuccess = () => resolve(request.result);
                 request.onerror = () => reject(`Error getting from ${storeName}`);
             });
         };
@@ -117,6 +135,9 @@
             const db = await initDB();
             return new Promise((resolve, reject) => {
                 const transaction = db.transaction(storeName, 'readwrite');
+                transaction.onerror = (event) => {
+                    reject(`Transaction error: ${event.target.error}`);
+                };
                 const store = transaction.objectStore(storeName);
                 const request = store.delete(id);
                 
@@ -153,7 +174,55 @@
             const [isFiltering, setIsFiltering] = useState(false);
             const [isFilteringNow, setIsFilteringNow] = useState(false);
             const filterTimeoutRef = useRef(null);
-            
+            const [savedMaterials, setSavedMaterials] = useState([]);
+            const [showMaterialSettings, setShowMaterialSettings] = useState(false);
+
+            // Добавление нового материала в настройки
+            const addSavedMaterial = async (material) => {
+                const materialWithId = {
+                    ...material,
+                    id: Date.now().toString()
+                };
+                
+                try {
+                    await saveData('materials', materialWithId);
+                    setSavedMaterials(prev => [...prev, materialWithId]);
+                } catch (error) {
+                    console.error('Failed to save material:', error);
+                }
+            };
+
+            // Удаление материала из настроек
+            const deleteSavedMaterial = async (materialId) => {
+                try {
+                    await deleteData('materials', materialId);
+                    setSavedMaterials(savedMaterials.filter(material => material.id !== materialId));
+                } catch (error) {
+                    console.error('Failed to delete material:', error);
+                }
+            };
+
+            // Загрузка сохраненных материалов при монтировании
+            useEffect(() => {
+                const loadMaterials = async () => {
+                    try {
+                        const db = await initDB();
+                        if (!db.objectStoreNames.contains('materials')) {
+                            console.log('Materials store not found, skipping load');
+                            setSavedMaterials([]);
+                            return;
+                        }
+
+                        const materials = await getAllData('materials');
+                        setSavedMaterials(materials || []);
+                    } catch (error) {
+                        console.error('Failed to load materials:', error);
+                        setSavedMaterials([]);
+                    }
+                };
+                loadMaterials();
+            }, []);
+
             // Загрузка данных и настроек при монтировании
             useEffect(() => {
                 const loadData = async () => {
@@ -173,8 +242,8 @@
                         // Загрузка темы
                         const savedTheme = await getData('settings', 'theme');
                         if (savedTheme) {
-                            setTheme(savedTheme);
-                            document.documentElement.classList.add(savedTheme);
+                            setTheme(savedTheme.value);
+                            document.documentElement.classList.add(savedTheme.value);
                         } else {
                             // Сохраняем тему по умолчанию
                             await saveData('settings', { id: 'theme', value: 'dark' });
@@ -221,18 +290,6 @@
                     } else {
                         setIsFilteringNow(false);
                     }
-                    console.log('filtering is:', isFilteringNow)
-                    console.log(
-                        filters,
-                        def_filters_asc,
-                        isEqual(filters, def_filters_asc)
-                    )
-                    console.log(
-                        filters,
-                        def_filters_desc,
-                        isEqual(filters, def_filters_desc)
-                    )
-
                 }, 500); // 500 мс задержки
                 
                 return () => {
@@ -416,8 +473,8 @@
                         const workHours = calculateWorkHours(
                             newArea.startTime, 
                             newArea.endTime, 
-                            shift.lunchStart || '12:00', 
-                            shift.lunchEnd || '13:00'
+                            shift.lunchStart, 
+                            shift.lunchEnd
                         );
                         return {
                             ...shift,
@@ -600,6 +657,7 @@
                                 onResetFilters={resetFilters}
                                 isFiltering={isFiltering}
                                 isFilteringNow={isFilteringNow}
+                                formatHoursToHMM={formatHoursToHMM}
                             />
                         )}
                         {activeTab === 'stats' && <StatsTab shifts={shifts} theme={theme} />}
@@ -612,6 +670,11 @@
                                 onDeleteSavedArea={deleteSavedArea}
                                 showAreaSettings={showAreaSettings}
                                 setShowAreaSettings={setShowAreaSettings}
+                                showMaterialSettings={showMaterialSettings}
+                                setShowMaterialSettings={setShowMaterialSettings}
+                                savedMaterials={savedMaterials}
+                                onAddSavedMaterial={addSavedMaterial}
+                                onDeleteSavedMaterial={deleteSavedMaterial}
                             />
                         )}
                     </div>
@@ -634,6 +697,7 @@
                             onCancel={() => setShowAreaForm(false)} 
                             theme={theme}
                             savedAreas={savedAreas}
+                            savedMaterials={savedMaterials}
                         />
                     )}
                 </div>
@@ -683,9 +747,9 @@
             onFilterChange,
             onResetFilters,
             isFiltering,
-            isFilteringNow
+            isFilteringNow,
+            formatHoursToHMM
         }) {
-            console.log('isFilteringNow:', isFilteringNow)
             // Форматируем дату в dd.mm.yyyy
             const formatDate = (dateString) => {
                 if (!dateString) return '';
@@ -705,6 +769,33 @@
                 });
 
                 return { totalQuantity, totalSheets };
+            };
+
+            const calculateShiftTotalHours = (shift) => {
+                if (!shift.areas || shift.areas.length === 0) return null;
+                
+                // Находим самое раннее начало и самый поздний конец среди всех участков
+                const startTimes = shift.areas.map(area => area.startTime);
+                const endTimes = shift.areas.map(area => area.endTime);
+                
+                const earliestStart = startTimes.reduce((earliest, current) => 
+                    current < earliest ? current : earliest);
+                const latestEnd = endTimes.reduce((latest, current) => 
+                    current > latest ? current : latest);
+                
+                // Вычисляем общее время смены
+                const totalHours = calculateWorkHours(
+                    earliestStart, 
+                    latestEnd, 
+                    shift.lunchStart || '12:00', 
+                    shift.lunchEnd || '13:00'
+                );
+                
+                return {
+                    start: earliestStart,
+                    end: latestEnd,
+                    total: totalHours
+                };
             };
 
             return (
@@ -912,11 +1003,19 @@
                                     <div className="flex justify-between items-center px-6 pt-6">
                                         <div>
                                             <h3 className="text-lg font-bold">{formatDate(shift.date)}</h3>
-                                                {shift.lunchStart && shift.lunchEnd && (
+                                            {shift.areas?.length > 0 && (
+                                                <>
                                                     <p className="text-sm dark:text-gray-500 text-gray-600 mt-1">
-                                                        Обед: {shift.lunchStart} - {shift.lunchEnd}
+                                                        Смена: {calculateShiftTotalHours(shift).start} - {calculateShiftTotalHours(shift).end} <br />
+                                                        Всего: {formatHoursToHMM(parseFloat(calculateShiftTotalHours(shift).total))}
                                                     </p>
-                                                )}
+                                                    {shift.lunchStart && shift.lunchEnd && (
+                                                        <p className="text-sm dark:text-gray-500 text-gray-600">
+                                                            Обед: {shift.lunchStart} - {shift.lunchEnd}
+                                                        </p>
+                                                    )}
+                                                </>
+                                            )}
                                         </div>
                                             <div className="flex items-center gap-3">
                                                 <button 
@@ -945,7 +1044,7 @@
                                                             <div>
                                                                 <h4 className="font-medium">{area.name}</h4>
                                                                 <p className="dark:text-gray-500 text-gray-600 text-sm">
-                                                                    {area.startTime} - {area.endTime} ({area.workHours} ч)
+                                                                    {area.startTime} - {area.endTime} ({formatHoursToHMM(parseFloat(area.workHours))})
                                                                 </p>
                                                                 {area.description && (
                                                                     <p className="dark:text-gray-500 text-gray-600 text-sm mt-1">
@@ -1176,7 +1275,7 @@
                                                 {formatDate(shift.date)}
                                             </div>
                                             <div className="text-sm dark:text-gray-500 text-gray-600">
-                                                {shift.areas?.length || 0} участков, {shift.areas?.reduce((sum, area) => sum + parseFloat(area.workHours), 0).toFixed(2)} ч
+                                                {shift.areas?.length || 0} участков, {formatHoursToHMM(shift.areas?.reduce((sum, area) => sum + parseFloat(area.workHours), 0) || 0)}
                                             </div>
                                         </div>
                                         <div className="text-green-500 font-medium">
@@ -1214,9 +1313,23 @@
         }
         
         // Компонент вкладки "Настройки"
-        function SettingsTab({ theme, toggleTheme, savedAreas, onAddSavedArea, onDeleteSavedArea, showAreaSettings, setShowAreaSettings }) {
+        function SettingsTab({
+            theme,
+            toggleTheme,
+            savedAreas,
+            onAddSavedArea,
+            onDeleteSavedArea,
+            showAreaSettings,
+            setShowAreaSettings,
+            showMaterialSettings,
+            setShowMaterialSettings,
+            savedMaterials,
+            onAddSavedMaterial,
+            onDeleteSavedMaterial
+        }) {
             const [newAreaName, setNewAreaName] = useState('');
-            
+            const [newMaterialName, setNewMaterialName] = useState('');           
+
             const handleAddArea = () => {
                 if (newAreaName.trim()) {
                     onAddSavedArea({
@@ -1224,6 +1337,15 @@
                         description: ''
                     });
                     setNewAreaName('');
+                }
+            };
+
+            const handleAddMaterial = () => {
+                if (newMaterialName.trim()) {
+                    onAddSavedMaterial({
+                        name: newMaterialName.trim()
+                    });
+                    setNewMaterialName('');
                 }
             };
             
@@ -1342,6 +1464,61 @@
                                     )}
                                 </div>
                             )}
+
+                            <button 
+                                onClick={() => setShowMaterialSettings(!showMaterialSettings)}
+                                className="w-full text-left p-3 hover:dark:bg-dark-700 hover:bg-light-700 rounded-lg flex justify-between items-center mt-4"
+                            >
+                                <span>
+                                    <i className="fas fa-boxes mr-2"></i>
+                                    Управление материалами
+                                </span>
+                                <i className={`fas fa-chevron-${showMaterialSettings ? 'up' : 'down'}`}></i>
+                            </button>
+                            
+                            {showMaterialSettings && (
+                                <div className="mt-4 space-y-4">
+                                    <div className="flex flex-col gap-2">
+                                        <input
+                                            type="text"
+                                            value={newMaterialName}
+                                            onChange={(e) => setNewMaterialName(e.target.value)}
+                                            className="flex-1 dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                            placeholder="Название материала"
+                                        />
+                                        <button
+                                            onClick={handleAddMaterial}
+                                            className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
+                                        >
+                                            <i className="fas fa-plus mr-2"></i>
+                                            Добавить материал
+                                        </button>
+                                    </div>
+                                    
+                                    {savedMaterials.length > 0 ? (
+                                        <div className="dark:bg-dark-700 bg-light-700 rounded-lg p-3">
+                                            <div className="space-y-3">
+                                                {savedMaterials.map((material) => (
+                                                    <div key={material.id} className="bg-primary dark:bg-primary p-4 flex justify-between items-center rounded-lg">
+                                                        <div className="font-medium text-white">{material.name}</div>
+                                                        <button
+                                                            onClick={() => onDeleteSavedMaterial(material.id)}
+                                                            className="text-red-500 hover:text-red-400 font-medium"
+                                                        >
+                                                            <i className="fas fa-times"></i>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center dark:text-gray-500 text-gray-600 py-4">
+                                            <i className="fas fa-boxes mr-2"></i>
+                                            Нет сохраненных материалов
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1447,7 +1624,17 @@
         }
         
 // Компонент формы добавления/редактирования участка
-function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme, savedAreas }) {
+function AreaForm({
+    shiftId,
+    areaIndex,
+    shift,
+    onAdd,
+    onUpdate,
+    onCancel,
+    theme,
+    savedAreas,
+    savedMaterials
+}) {
     const isEditing = areaIndex !== null;
     const areaData = isEditing ? shift.areas[areaIndex] : null;
     
@@ -1458,7 +1645,23 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
     const [payment, setPayment] = useState(areaData?.payment || '');
     const [materials, setMaterials] = useState(areaData?.materials || [{ name: '', quantity: '', sheets: '' }]);
     const [selectedAreaId, setSelectedAreaId] = useState('');
+    const [selectedMaterialId, setSelectedMaterialId] = useState('');
     
+    // При выборе сохраненного материала
+    useEffect(() => {
+        if (selectedMaterialId) {
+            const selectedMaterial = savedMaterials.find(m => m.id === selectedMaterialId);
+            if (selectedMaterial) {
+                const newMaterials = [...materials];
+                newMaterials[newMaterials.length - 1] = {
+                    ...newMaterials[newMaterials.length - 1],
+                    name: selectedMaterial.name
+                };
+                setMaterials(newMaterials);
+                setSelectedMaterialId('');
+            }
+        }
+    }, [selectedMaterialId, savedMaterials]);
 
     // При выборе сохраненного участка
     useEffect(() => {
@@ -1665,13 +1868,26 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
                                                     <label className="block text-xs font-medium mb-1 dark:text-gray-400 text-gray-600">
                                                         Название материала
                                                     </label>
-                                                    <input 
-                                                        type="text" 
-                                                        value={material.name}
-                                                        onChange={(e) => handleMaterialChange(index, 'name', e.target.value)}
-                                                        className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
-                                                        placeholder="Название"
-                                                    />
+                                                    {savedMaterials.length > 0 ? (
+                                                        <select
+                                                            value={selectedMaterialId}
+                                                            onChange={(e) => setSelectedMaterialId(e.target.value)}
+                                                            className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 mt-1"
+                                                        >
+                                                            <option value="">-- Выберите материал --</option>
+                                                            {savedMaterials.map(material => (
+                                                                <option key={material.id} value={material.id}>{material.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
+                                                        <input 
+                                                            type="text" 
+                                                            value={material.name}
+                                                            onChange={(e) => handleMaterialChange(index, 'name', e.target.value)}
+                                                            className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                                            placeholder="Название"
+                                                        />
+                                                    )}
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div>
@@ -1769,11 +1985,9 @@ function AreaForm({ shiftId, areaIndex, shift, onAdd, onUpdate, onCancel, theme,
             
             let totalMs = end - start;
             
-            // Проверяем пересекается ли время работы с обедом
-            if (start < lunchE && end > lunchS) {
-                const overlapStart = new Date(Math.max(start, lunchS));
-                const overlapEnd = new Date(Math.min(end, lunchE));
-                const lunchDuration = overlapEnd - overlapStart;
+            // Проверяем полностью ли охватывается обеденное время
+            if (start <= lunchS && end >= lunchE) {
+                const lunchDuration = lunchE - lunchS;
                 totalMs -= Math.max(0, lunchDuration);
             }
             
