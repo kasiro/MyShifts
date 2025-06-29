@@ -282,7 +282,8 @@
                     result = result.filter(shift => {
                         return shift.areas?.some(area => {
                             return area.materials?.some(material => {
-                                const sheets = parseInt(material.sheets) || 0;
+                                const sheets = Number(material.sheets) || 0;
+                                if (sheets == 0) return false;
                                 let valid = true;
                                 if (filters.minSheets) valid = valid && sheets >= parseInt(filters.minSheets);
                                 if (filters.maxSheets) valid = valid && sheets <= parseInt(filters.maxSheets);
@@ -934,39 +935,88 @@
                                                         
                                                         {area.materials?.length > 0 && (
                                                             <>
-                                                                <div className="mt-4 w-full">
-                                                                    <h5 className="w-full text-sm font-medium dark:text-gray-500 text-gray-600 mb-2">
+                                                                <div className="mt-4">
+                                                                    <h5 className="text-sm font-medium dark:text-gray-500 text-gray-600 mb-3">
                                                                         <i className="fas fa-boxes mr-1"></i>
                                                                         Материалы:
                                                                     </h5>
-                                                                    <div className="w-full dark:bg-dark-700 bg-light-700 rounded-lg p-3">
-                                                                        <div className="grid grid-cols-3 gap-2 text-sm font-medium dark:text-gray-400 text-gray-500 mb-2">
-                                                                            <div>Название</div>
-                                                                            <div>Количество</div>
-                                                                            <div>Листы</div>
+                                                                    
+                                                                    {/* Для компьютеров (таблица) */}
+                                                                    <div className="hidden md:block w-full dark:bg-dark-700 bg-light-700 rounded-lg p-3">
+                                                                        <div className="grid grid-cols-12 gap-2 text-sm font-medium dark:text-gray-400 text-gray-500 mb-2">
+                                                                            <div className="col-span-6">Название материала</div>
+                                                                            <div className="col-span-3">Количество</div>
+                                                                            <div className="col-span-3">Листы</div>
                                                                         </div>
+                                                                        
                                                                         {area.materials.map((material, matIndex) => (
-                                                                            <div key={matIndex} className="grid grid-cols-3 gap-5 py-1 border-b dark:border-dark-600 border-light-500 last:border-0">
-                                                                                <div>{material.name}</div>
-                                                                                <div>{material.quantity}</div>
-                                                                                <div>{material.sheets || '-'}</div>
+                                                                            <div 
+                                                                                key={matIndex} 
+                                                                                className="grid grid-cols-12 gap-2 py-2 border-b dark:border-dark-600 border-light-500 last:border-0 items-center"
+                                                                            >
+                                                                                <div className="col-span-6 min-w-0">
+                                                                                    <span className="whitespace-nowrap overflow-hidden text-ellipsis block">
+                                                                                        {material.name}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="col-span-3">{material.quantity}</div>
+                                                                                <div className="col-span-3">{material.sheets || '-'}</div>
                                                                             </div>
                                                                         ))}
+                                                                        
+                                                                        {/* Итоговая строка для компьютеров */}
+                                                                        <div className="grid grid-cols-12 gap-2 py-2 pt-3 border-t-2 dark:border-dark-500 border-light-400 font-medium">
+                                                                            <div className="col-span-6">Итого:</div>
+                                                                            <div className="col-span-3">{areaTotals.totalQuantity}</div>
+                                                                            <div className="col-span-3">{areaTotals.totalSheets}</div>
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                                <div className="flex justify-between mt-3 pt-2 border-t dark:border-dark-600 border-light-500">
-                                                                    <span className="text-sm font-medium dark:text-gray-400 text-gray-500">
-                                                                        Итого по участку:
-                                                                    </span>
-                                                                    <div className="flex gap-4">
-                                                                        <span className="text-sm">
-                                                                            <span className="dark:text-gray-400 text-gray-500">Кол-во: </span>
-                                                                            <span className="font-medium">{areaTotals.totalQuantity}</span>
-                                                                        </span>
-                                                                        <span className="text-sm">
-                                                                            <span className="dark:text-gray-400 text-gray-500">Листы: </span>
-                                                                            <span className="font-medium">{areaTotals.totalSheets}</span>
-                                                                        </span>
+                                                                    
+                                                                    {/* Для мобильных (карточки) */}
+                                                                    <div className="md:hidden space-y-3">
+                                                                        {area.materials.map((material, matIndex) => (
+                                                                            <div 
+                                                                                key={matIndex} 
+                                                                                className="dark:bg-dark-700 bg-light-700 rounded-lg p-4"
+                                                                            >
+                                                                                <div className="flex justify-between items-center pb-2">
+                                                                                    <span className="text-right whitespace-nowrap">
+                                                                                        {material.name}
+                                                                                    </span>
+                                                                                </div>
+                                                                                
+                                                                                <div className="h-px w-full dark:bg-dark-600 bg-light-500 my-2"></div>
+                                                                                
+                                                                                <div className="flex justify-between items-center py-2">
+                                                                                    <span className="font-medium">Количество:</span>
+                                                                                    <span>{material.quantity}</span>
+                                                                                </div>
+                                                                                
+                                                                                <div className="h-px w-full dark:bg-dark-600 bg-light-500 my-2"></div>
+                                                                                
+                                                                                <div className="flex justify-between items-center pt-2">
+                                                                                    <span className="font-medium">Листы:</span>
+                                                                                    <span>{material.sheets || '-'}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                        
+                                                                        <div className="flex justify-between mt-3 pt-2 border-t dark:border-dark-600 border-light-500">
+                                                                            <span className="text-sm font-medium dark:text-gray-400 text-gray-500">
+                                                                                Итого по участку:
+                                                                            </span>
+                                                                            <div className="flex gap-4">
+                                                                                <span className="text-sm">
+                                                                                    <span className="dark:text-gray-400 text-gray-500">Кол-во: </span>
+                                                                                    <span className="font-medium">{areaTotals.totalQuantity}</span>
+                                                                                </span>
+                                                                                <span className="text-sm">
+                                                                                    <span className="dark:text-gray-400 text-gray-500">Листы: </span>
+                                                                                    <span className="font-medium">{areaTotals.totalSheets}</span>
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+
                                                                     </div>
                                                                 </div>
                                                             </>
