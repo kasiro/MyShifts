@@ -271,6 +271,7 @@
 
             // Применение фильтров при их изменении
             useEffect(() => {
+                if (shifts.length === 0) return;
                 setIsFiltering(true);
 
 
@@ -604,6 +605,95 @@
                     console.error('Failed to delete area:', error);
                 }
             };
+            
+            function SelectInput({
+                value = '',
+                onChange = () => {},
+                List,
+                onSelect,
+                readonly_ = false,
+                classes = ''
+            }) {
+                const [inputValue, setInputValue] = useState(value);
+                const [showSuggestions, setShowSuggestions] = useState(false);
+                const [suggestions, setSuggestions] = useState([]);
+                const inputRef = useRef(null);
+                
+                const handleChange = (e) => {
+                    const value = e.target.value;
+                    setInputValue(value);
+                    
+                    // Фильтруем материалы по введенному значению
+                    if (value.length > 0) {
+                        const filtered = List.filter(el => 
+                            el.name.toLowerCase().includes(value.toLowerCase())
+                        );
+                        setSuggestions(filtered);
+                        setShowSuggestions(filtered.length > 0);
+                    } else {
+                        setSuggestions([]);
+                        setShowSuggestions(false);
+                    }
+                    
+                    onChange(e);
+                };
+                useEffect(() => {
+                   if (readonly_) {
+                       setSuggestions(List);
+                   }
+                }, [readonly_, List]);
+                
+                // Выбор из списка
+                const handleSelect = (el) => {
+                    setInputValue(el.name);
+                    setShowSuggestions(false);
+                    if (onSelect) {
+                        onSelect(el.name);
+                    }
+                };
+                
+                // Закрытие списка при клике вне input
+                useEffect(() => {
+                    const handleClickOutside = (e) => {
+                        if (inputRef.current && !inputRef.current.contains(e.target)) {
+                            setShowSuggestions(false);
+                        }
+                    };
+                    
+                    document.addEventListener('mousedown', handleClickOutside);
+                    return () => {
+                        document.removeEventListener('mousedown', handleClickOutside);
+                    };
+                }, []);
+                
+                return (
+                    <div className="relative" ref={inputRef}>
+                        <input 
+                            type="text" 
+                            value={inputValue}
+                            onChange={handleChange}
+                            onFocus={() => setShowSuggestions(suggestions.length > 0)}
+                            className={`${classes} w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600`}
+                            placeholder="Название"
+                            readOnly={readonly_}
+                        />
+                        
+                        {showSuggestions && (
+                            <div className="absolute z-10 mt-1 w-full dark:bg-dark-600 bg-white border dark:border-dark-500 border-light-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                {suggestions.map((el) => (
+                                    <div
+                                        key={el.id}
+                                        className="px-3 py-2 hover:dark:bg-dark-500 hover:bg-light-500 cursor-pointer"
+                                        onClick={() => handleSelect(el)}
+                                    >
+                                        {el.name}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
 
             return (
                 <div className="max-w-6xl mx-auto px-4 py-8">
@@ -698,6 +788,7 @@
                             theme={theme}
                             savedAreas={savedAreas}
                             savedMaterials={savedMaterials}
+                            SelectInput={SelectInput}
                         />
                     )}
                 </div>
@@ -1633,7 +1724,8 @@ function AreaForm({
     onCancel,
     theme,
     savedAreas,
-    savedMaterials
+    savedMaterials,
+    SelectInput
 }) {
     const isEditing = areaIndex !== null;
     const areaData = isEditing ? shift.areas[areaIndex] : null;
@@ -1647,9 +1739,19 @@ function AreaForm({
     const [selectedAreaId, setSelectedAreaId] = useState('');
     const [selectedMaterialId, setSelectedMaterialId] = useState('');
     
+    const clearMaterialName = (index) => {
+        const newMaterials = [...materials];
+        newMaterials[index] = {
+            ...newMaterials[index],
+            name: ''
+        };
+        setMaterials(newMaterials);
+    };
+    
     // При выборе сохраненного материала
     useEffect(() => {
         if (selectedMaterialId) {
+            console.log('материал ввбран');
             const selectedMaterial = savedMaterials.find(m => m.id === selectedMaterialId);
             if (selectedMaterial) {
                 const newMaterials = [...materials];
@@ -1663,17 +1765,14 @@ function AreaForm({
         }
     }, [selectedMaterialId, savedMaterials]);
 
-    // При выборе сохраненного участка
-    useEffect(() => {
-        if (selectedAreaId) {
-            const selectedArea = savedAreas.find(a => a.id === selectedAreaId);
-            if (selectedArea) {
-                setName(selectedArea.name);
-                setDescription(selectedArea.description || '');
-            }
+    const handleAreaSelect = (areaName) => {
+        const selectedArea = savedAreas.find(area => area.name === areaName);
+        if (selectedArea) {
+            setName(selectedArea.name);
+            setDescription(selectedArea.description || '');
         }
-    }, [selectedAreaId, savedAreas]);
-
+    };
+    
     const [totalQuantity, setTotalQuantity] = useState(0);
     const [totalSheets, setTotalSheets] = useState(0);
 
@@ -1750,20 +1849,12 @@ function AreaForm({
                         <div className="space-y-4">
                             {!isEditing && savedAreas.length > 0 ? (
                                 <div>
-                                    <label className="block text-sm font-medium mb-1">
-                                        <i className="fas fa-map-marker-alt mr-2"></i>
-                                        Выберите участок
-                                    </label>
-                                    <select
-                                        value={selectedAreaId}
-                                        onChange={(e) => setSelectedAreaId(e.target.value)}
-                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
-                                    >
-                                        <option value="">-- Выберите участок --</option>
-                                        {savedAreas.map(area => (
-                                            <option key={area.id} value={area.id}>{area.name}</option>
-                                        ))}
-                                    </select>
+                                    <SelectInput
+                                        onChange={(name) => setName(index, name)}
+                                        onSelect={handleAreaSelect}
+                                        List={savedAreas}
+                                        readonly_={true}
+                                    />
                                 </div>
                             ) : (
                                 <div>
@@ -1869,16 +1960,12 @@ function AreaForm({
                                                         Название материала
                                                     </label>
                                                     {savedMaterials.length > 0 ? (
-                                                        <select
-                                                            value={selectedMaterialId}
-                                                            onChange={(e) => setSelectedMaterialId(e.target.value)}
-                                                            className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 mt-1"
-                                                        >
-                                                            <option value="">-- Выберите материал --</option>
-                                                            {savedMaterials.map(material => (
-                                                                <option key={material.id} value={material.id}>{material.name}</option>
-                                                            ))}
-                                                        </select>
+                                                            <SelectInput
+                                                                value={material.name}
+                                                                onChange={(e) => handleMaterialChange(index, 'name', e.target.value)}
+                                                                onSelect={(name) => handleMaterialChange(index, 'name', name)}
+                                                                List={savedMaterials}
+                                                            />
                                                     ) : (
                                                         <input 
                                                             type="text" 
