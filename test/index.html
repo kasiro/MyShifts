@@ -2124,7 +2124,6 @@ function AreaForm({
     // При выборе сохраненного материала
     useEffect(() => {
         if (selectedMaterialId) {
-            console.log('материал ввбран');
             const selectedMaterial = savedMaterials.find(m => m.id === selectedMaterialId);
             if (selectedMaterial) {
                 const newMaterials = [...materials];
@@ -2145,7 +2144,7 @@ function AreaForm({
             setDescription(selectedArea.description || '');
         }
     };
-    
+
     const [totalQuantity, setTotalQuantity] = useState(0);
     const [totalSheets, setTotalSheets] = useState(0);
 
@@ -2389,6 +2388,7 @@ function AreaForm({
                                                     {savedMaterials.length > 0 ? (
                                                             <SelectInput
                                                                 value={material.name}
+                                                                valueKey="name"
                                                                 onChange={(e) => handleMaterialChange(index, 'name', e.target.value)}
                                                                 onSelect={(name) => handleMaterialChange(index, 'name', name)}
                                                                 List={savedMaterials}
