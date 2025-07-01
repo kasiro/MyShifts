@@ -43,7 +43,7 @@
     <div id="root" class="min-h-screen pb-16"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
         const { createRoot } = ReactDOM;
         // Инициализация IndexedDB
         const initDB = () => {
@@ -709,92 +709,114 @@
             };
             
             function SelectInput({
-                value = '',
-                onChange = () => {},
-                List,
-                onSelect,
-                readonly_ = false,
-                classes = ''
+              value: controlledValue = '',
+              onChange,
+              List = [],
+              onSelect = () => {},
+              readonly_ = false,
+              classes = '',
+              placeholder_ = '',
+              labelKey = 'name',
+              valueKey = 'id',
+              children
             }) {
-                const [inputValue, setInputValue] = useState(value);
-                const [showSuggestions, setShowSuggestions] = useState(false);
-                const [suggestions, setSuggestions] = useState([]);
-                const inputRef = useRef(null);
-                
-                const handleChange = (e) => {
+              const [inputValue, setInputValue] = useState(controlledValue);
+              const [showSuggestions, setShowSuggestions] = useState(false);
+              const inputRef = useRef(null);
+
+              // Получаем список вариантов один раз при монтировании
+              const options = useMemo(() => {
+                if (children) {
+                  return React.Children.map(children, child => {
+                    if (!React.isValidElement(child)) return null;
+                    if (child.type === 'option') {
+                      return {
+                        id: child.props.value,
+                        name: child.props.children,
+                        value: child.props.value
+                      };
+                    }
+                    return null;
+                  }).filter(Boolean);
+                }
+                return List.map((item, index) => {
+                  if (typeof item === 'string') {
+                    return { id: index, name: item, value: item };
+                  }
+                  return {
+                    id: item.id ?? item[valueKey] ?? index,
+                    name: item[labelKey] ?? item.name ?? String(item),
+                    value: item[valueKey] ?? item.id ?? item
+                  };
+                });
+              }, [children, List, labelKey, valueKey]);
+
+              // Фильтруем варианты на основе ввода
+              const filteredOptions = useMemo(() => {
+                if (!inputValue) return options;
+                return options.filter(item =>
+                  String(item.name).toLowerCase().includes(inputValue.toLowerCase())
+                );
+              }, [inputValue, options]);
+
+              // Синхронизация с внешним значением
+              useEffect(() => {
+                setInputValue(controlledValue);
+              }, [controlledValue]);
+
+              const handleChange = (e) => {
+                if (onChange) {
                     const value = e.target.value;
                     setInputValue(value);
-                    
-                    // Фильтруем материалы по введенному значению
-                    if (value.length > 0) {
-                        const filtered = List.filter(el => 
-                            el.name.toLowerCase().includes(value.toLowerCase())
-                        );
-                        setSuggestions(filtered);
-                        setShowSuggestions(filtered.length > 0);
-                    } else {
-                        setSuggestions([]);
-                        setShowSuggestions(false);
-                    }
-                    
                     onChange(e);
-                };
-                useEffect(() => {
-                   if (readonly_) {
-                       setSuggestions(List);
-                   }
-                }, [readonly_, List]);
-                
-                // Выбор из списка
-                const handleSelect = (el) => {
-                    setInputValue(el.name);
+                }
+              };
+
+              const handleSelect = (item) => {
+                setInputValue(item.name);
+                setShowSuggestions(false);
+                onSelect(item.value);
+              };
+
+              // Закрытие при клике вне инпута
+              useEffect(() => {
+                const handleClickOutside = (e) => {
+                  if (inputRef.current && !inputRef.current.contains(e.target)) {
                     setShowSuggestions(false);
-                    if (onSelect) {
-                        onSelect(el.name);
-                    }
+                  }
                 };
-                
-                // Закрытие списка при клике вне input
-                useEffect(() => {
-                    const handleClickOutside = (e) => {
-                        if (inputRef.current && !inputRef.current.contains(e.target)) {
-                            setShowSuggestions(false);
-                        }
-                    };
-                    
-                    document.addEventListener('mousedown', handleClickOutside);
-                    return () => {
-                        document.removeEventListener('mousedown', handleClickOutside);
-                    };
-                }, []);
-                
-                return (
-                    <div className="relative" ref={inputRef}>
-                        <input 
-                            type="text" 
-                            value={inputValue}
-                            onChange={handleChange}
-                            onFocus={() => setShowSuggestions(suggestions.length > 0)}
-                            className={`${classes} w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600`}
-                            placeholder="Название"
-                            readOnly={readonly_}
-                        />
-                        
-                        {showSuggestions && (
-                            <div className="absolute z-10 mt-1 w-full dark:bg-dark-600 bg-white border dark:border-dark-500 border-light-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                {suggestions.map((el) => (
-                                    <div
-                                        key={el.id}
-                                        className="px-3 py-2 hover:dark:bg-dark-500 hover:bg-light-500 cursor-pointer"
-                                        onClick={() => handleSelect(el)}
-                                    >
-                                        {el.name}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+              }, []);
+
+              return (
+                <div className="relative" ref={inputRef}>
+                  <input
+                    type="text"
+                    value={inputValue}
+                    onChange={handleChange}
+                    onFocus={() => setShowSuggestions(filteredOptions.length > 0)}
+                    className={`${classes} w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600`}
+                    placeholder={placeholder_ || 'Название...'}
+                    readOnly={readonly_}
+                  />
+
+                  {showSuggestions && filteredOptions.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full dark:bg-dark-600 bg-white border dark:border-dark-500 border-light-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredOptions.map((item) => (
+                        <div
+                          key={item.id}
+                          className="px-3 py-2 hover:dark:bg-dark-500 hover:bg-light-500 cursor-pointer"
+                          onClick={() => handleSelect(item)}
+                        >
+                          {item.name}
+                        </div>
+                      ))}
                     </div>
-                );
+                  )}
+                </div>
+              );
             }
 
             return (
@@ -843,6 +865,7 @@
                                 savedMaterials={savedMaterials}
                                 onAddSavedMaterial={addSavedMaterial}
                                 onDeleteSavedMaterial={deleteSavedMaterial}
+                                SelectInput={SelectInput}
                             />
                         )}
                     </div>
@@ -905,12 +928,34 @@
             );
         }
         
+        function Group({ name, onClick, icon, children }) {
+            const [showGroup, setShowGroup] = useState(false);
+            
+            return (
+                <div className="mt-4">
+                    <button 
+                        onClick={() => setShowGroup(!showGroup)}
+                        className="w-full text-left p-3 hover:dark:bg-dark-700 hover:bg-light-700 rounded-lg flex justify-between items-center"
+                    >
+                        <span>
+                            <i className={`fas fa-${icon} mr-2`}></i>
+                            {name}
+                        </span>
+                        <i className={`fas fa-chevron-${showGroup ? 'up' : 'down'}`}></i>
+                    </button>
+
+                    {showGroup && children}
+                </div>
+            );
+        }
+
         function MaterialPricesSettings({
             savedAreas,
             savedMaterials,
             theme,
             showMaterialPrices,
-            setShowMaterialPrices
+            setShowMaterialPrices,
+            SelectInput
         }) {
             const [selectedArea, setSelectedArea] = useState('');
             const [materialPrices, setMaterialPrices] = useState([]);
@@ -919,6 +964,15 @@
                 pricePerUnit: '',
                 pricePerSheet: ''
             });
+
+            const selectedAreaName = useMemo(() => {
+                const area = savedAreas.find(a => a.id === selectedArea);
+                return area ? area.name : '';
+            }, [selectedArea, savedAreas]);
+
+             const handleAreaSelect = (areaId) => {
+                setSelectedArea(areaId);
+             };
 
             useEffect(() => {
                 if (!selectedArea) {
@@ -989,16 +1043,16 @@
                                     <label className="block text-sm font-medium mb-1">
                                         Участок
                                     </label>
-                                    <select
-                                        value={selectedArea}
-                                        onChange={(e) => setSelectedArea(e.target.value)}
-                                        className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                    <SelectInput
+                                        value={selectedAreaName}
+                                        labelKey="name"
+                                        valueKey="id"
+                                        onSelect={handleAreaSelect}
                                     >
-                                        <option value="">Выберите участок</option>
                                         {savedAreas.map(area => (
                                             <option key={area.id} value={area.id}>{area.name}</option>
                                         ))}
-                                    </select>
+                                    </SelectInput>
                                 </div>
 
                                 {selectedArea && (
@@ -1007,6 +1061,16 @@
                                             <label className="block text-sm font-medium mb-1">
                                                 Материал
                                             </label>
+                                            <SelectInput 
+                                                labelKey="name"
+                                                valueKey="id"
+                                                onSelect={(id) => setNewPrice({...newPrice, materialId: id})}
+                                            >
+                                                {savedMaterials.map(material => (
+                                                    <option key={material.id} value={material.id}>{material.name}</option>
+                                                ))}
+                                            </SelectInput>
+                                            {/*
                                             <select
                                                 value={newPrice.materialId}
                                                 onChange={(e) => setNewPrice({...newPrice, materialId: e.target.value})}
@@ -1017,6 +1081,7 @@
                                                     <option key={material.id} value={material.id}>{material.name}</option>
                                                 ))}
                                             </select>
+                                            */}
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -1030,8 +1095,6 @@
                                                     onChange={(e) => setNewPrice({...newPrice, pricePerUnit: e.target.value})}
                                                     className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
                                                     placeholder="0.00"
-                                                    step="0.01"
-                                                    min="0"
                                                 />
                                             </div>
                                             <div>
@@ -1044,8 +1107,6 @@
                                                     onChange={(e) => setNewPrice({...newPrice, pricePerSheet: e.target.value})}
                                                     className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
                                                     placeholder="0.00"
-                                                    step="0.01"
-                                                    min="0"
                                                 />
                                             </div>
                                         </div>
@@ -1397,12 +1458,12 @@
                                             <h3 className="text-lg font-bold">{formatDate(shift.date)}</h3>
                                             {shift.areas?.length > 0 && (
                                                 <>
-                                                    <p className="text-sm dark:text-gray-500 text-gray-600 mt-1">
+                                                    <p className="text-sm text-gray-400 mt-1">
                                                         Смена: {calculateShiftTotalHours(shift).start} - {calculateShiftTotalHours(shift).end} <br />
                                                         Всего: {formatHoursToHMM(parseFloat(calculateShiftTotalHours(shift).total))}
                                                     </p>
                                                     {shift.lunchStart && shift.lunchEnd && (
-                                                        <p className="text-sm dark:text-gray-500 text-gray-600">
+                                                        <p className="text-sm text-gray-400">
                                                             Обед: {shift.lunchStart} - {shift.lunchEnd}
                                                         </p>
                                                     )}
@@ -1435,11 +1496,11 @@
                                                         <div className="flex justify-between items-start mb-4">
                                                             <div>
                                                                 <h4 className="font-medium">{area.name}</h4>
-                                                                <p className="dark:text-gray-500 text-gray-600 text-sm">
+                                                                <p className="dark:text-gray-400 text-gray-600 text-sm">
                                                                     {area.startTime} - {area.endTime} ({formatHoursToHMM(parseFloat(area.workHours))})
                                                                 </p>
                                                                 {area.description && (
-                                                                    <p className="dark:text-gray-500 text-gray-600 text-sm mt-1">
+                                                                    <p className="dark:text-gray-400 text-gray-600 text-sm mt-1">
                                                                         {area.description}
                                                                     </p>
                                                                 )}
@@ -1452,7 +1513,7 @@
                                                         {area.materials?.length > 0 && (
                                                             <>
                                                                 <div className="mt-4">
-                                                                    <h5 className="text-sm font-medium dark:text-gray-500 text-gray-600 mb-3">
+                                                                    <h5 className="text-sm font-medium dark:text-gray-400 text-gray-600 mb-3">
                                                                         <i className="fas fa-boxes mr-1"></i>
                                                                         Материалы:
                                                                     </h5>
@@ -1666,7 +1727,7 @@
                                                 <i className="fas fa-calendar-day mr-2"></i>
                                                 {formatDate(shift.date)}
                                             </div>
-                                            <div className="text-sm dark:text-gray-500 text-gray-600">
+                                            <div className="text-sm dark:text-gray-400 text-gray-600">
                                                 {shift.areas?.length || 0} участков, {formatHoursToHMM(shift.areas?.reduce((sum, area) => sum + parseFloat(area.workHours), 0) || 0)}
                                             </div>
                                         </div>
@@ -1717,7 +1778,8 @@
             setShowMaterialSettings,
             savedMaterials,
             onAddSavedMaterial,
-            onDeleteSavedMaterial
+            onDeleteSavedMaterial,
+            SelectInput
         }) {
             const [newAreaName, setNewAreaName] = useState('');
             const [newMaterialName, setNewMaterialName] = useState('');           
@@ -1835,9 +1897,9 @@
                                         <div className="dark:bg-dark-700 bg-light-700 rounded-lg p-3">
                                             <div>
                                                 {savedAreas.map((area) => (
-                                                    <div key={area.id} className="bg-primary dark:bg-primary mt-3 p-4 flex justify-between items-center rounded-lg">
+                                                    <div key={area.id} className="bg-light-600 dark:bg-dark-600 mt-3 p-4 flex justify-between items-center rounded-lg">
                                                         <div>
-                                                            <div className="font-medium text-white">{area.name}</div>
+                                                            <div className="font-medium">{area.name}</div>
                                                         </div>
                                                         <button
                                                             onClick={() => onDeleteSavedArea(area.id)}
@@ -1892,8 +1954,8 @@
                                         <div className="dark:bg-dark-700 bg-light-700 rounded-lg p-3">
                                             <div className="space-y-3">
                                                 {savedMaterials.map((material) => (
-                                                    <div key={material.id} className="bg-primary dark:bg-primary p-4 flex justify-between items-center rounded-lg">
-                                                        <div className="font-medium text-white">{material.name}</div>
+                                                    <div key={material.id} className="bg-light-600 dark:bg-dark-600 p-4 flex justify-between items-center rounded-lg">
+                                                        <div className="font-medium">{material.name}</div>
                                                         <button
                                                             onClick={() => onDeleteSavedMaterial(material.id)}
                                                             className="text-red-500 hover:text-red-400 font-medium"
@@ -1918,6 +1980,7 @@
                                 theme={theme}
                                 showMaterialPrices={showMaterialPrices}
                                 setShowMaterialPrices={setShowMaterialPrices}
+                                SelectInput={SelectInput}
                             />
                         </div>
                     </div>
