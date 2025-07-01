@@ -48,7 +48,7 @@
         // Инициализация IndexedDB
         const initDB = () => {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open('WorkShiftDB', 4);
+                const request = indexedDB.open('WorkShiftDB', 5);
                 
                 request.onupgradeneeded = (event) => {
                     const db = event.target.result;
@@ -65,6 +65,16 @@
                     if (!db.objectStoreNames.contains('materials')) {
                         db.createObjectStore('materials', { keyPath: 'id' });
                     }
+                    if (!db.objectStoreNames.contains('material_prices')) {
+                        const priceStore = db.createObjectStore('material_prices', {
+                            keyPath: 'id'
+                        });
+                        priceStore.createIndex(
+                            'area_material_idx',
+                            ['areaId', 'materialId'],
+                            { unique: true }
+                        );
+                    }
                 };
                 
                 request.onsuccess = (event) => {
@@ -76,7 +86,7 @@
                 };
             });
         };
-        
+
         const formatHoursToHMM = (hours) => {
             const totalMinutes = Math.round(hours * 60);
             const h = Math.floor(totalMinutes / 60);
@@ -103,8 +113,98 @@
                 request.onerror = () => reject(`Error saving to ${storeName}`);
             });
         };
+        
+        const checkStoreExists = async (storeName) => {
+            const db = await initDB();
+            return db.objectStoreNames.contains(storeName);
+        };
 
-        // Получение данных из IndexedDB
+        // Функции для работы с ценами материалов
+        // Сохранение цены материала
+        const saveMaterialPrice = async (priceData) => {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction('material_prices', 'readwrite');
+                const store = transaction.objectStore('material_prices');
+                
+                // Проверяем, существует ли уже такая запись
+                const index = store.index('area_material_idx');
+                const checkRequest = index.get([priceData.areaId, priceData.materialId]);
+                
+                checkRequest.onsuccess = () => {
+                    if (checkRequest.result) {
+                        // Обновляем существующую запись
+                        const existing = checkRequest.result;
+                        const updated = {
+                            ...existing,
+                            pricePerUnit: priceData.pricePerUnit,
+                            pricePerSheet: priceData.pricePerSheet
+                        };
+                        store.put(updated).onsuccess = resolve;
+                    } else {
+                        // Добавляем новую запись
+                        store.add({
+                            id: Date.now().toString(),
+                            ...priceData
+                        }).onsuccess = resolve;
+                    }
+                };
+                
+                transaction.onerror = () => reject(transaction.error);
+            });
+        };
+
+        // Получение цен по участку
+        const getMaterialPricesByArea = async (areaId) => {
+            const db = await initDB();
+            return new Promise((resolve) => {
+                const transaction = db.transaction('material_prices', 'readonly');
+                const store = transaction.objectStore('material_prices');
+                const prices = [];
+                
+                // Используем курсор для перебора всех записей
+                const request = store.openCursor();
+                
+                request.onsuccess = (e) => {
+                    const cursor = e.target.result;
+                    if (cursor) {
+                        if (cursor.value.areaId === areaId) {
+                            prices.push(cursor.value);
+                        }
+                        cursor.continue();
+                    } else {
+                        resolve(prices);
+                    }
+                };
+                
+                request.onerror = () => resolve([]);
+            });
+        };
+
+        // Получение конкретной цены
+        const getMaterialPrice = async (areaId, materialId) => {
+            const db = await initDB();
+            return new Promise((resolve) => {
+                const transaction = db.transaction('material_prices', 'readonly');
+                const store = transaction.objectStore('material_prices');
+                const index = store.index('area_material_idx');
+                
+                index.get([areaId, materialId]).onsuccess = (e) => resolve(e.target.result);
+            });
+        };
+
+        // Удаление цены
+        const deleteMaterialPrice = async (id) => {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction('material_prices', 'readwrite');
+                const store = transaction.objectStore('material_prices');
+                
+                store.delete(id).onsuccess = () => resolve();
+                transaction.onerror = () => reject(transaction.error);
+            });
+        };
+            // Получение данных из IndexedDB
         const getData = async (storeName, id) => {
             const db = await initDB();
             return new Promise((resolve, reject) => {
@@ -222,7 +322,7 @@
                 };
                 loadMaterials();
             }, []);
-
+            
             // Загрузка данных и настроек при монтировании
             useEffect(() => {
                 const loadData = async () => {
@@ -449,6 +549,8 @@
                     console.error('Failed to save shift:', error);
                 }
             };
+
+            
             
             // Добавление новой смены
             const addShift = async (newShift) => {
@@ -803,6 +905,196 @@
             );
         }
         
+        function MaterialPricesSettings({
+            savedAreas,
+            savedMaterials,
+            theme,
+            showMaterialPrices,
+            setShowMaterialPrices
+        }) {
+            const [selectedArea, setSelectedArea] = useState('');
+            const [materialPrices, setMaterialPrices] = useState([]);
+            const [newPrice, setNewPrice] = useState({
+                materialId: '',
+                pricePerUnit: '',
+                pricePerSheet: ''
+            });
+
+            useEffect(() => {
+                if (!selectedArea) {
+                    setMaterialPrices([]);
+                    return;
+                }
+
+                const loadPrices = async () => {
+                    try {
+                        const prices = await getMaterialPricesByArea(selectedArea);
+                        setMaterialPrices(prices);
+                    } catch (error) {
+                        console.error('Ошибка загрузки цен:', error);
+                    }
+                };
+                
+                loadPrices();
+            }, [selectedArea]);
+
+            const handleAddPrice = async () => {
+                if (!selectedArea || !newPrice.materialId) return;
+
+                try {
+                    await saveMaterialPrice({
+                        areaId: selectedArea,
+                        materialId: newPrice.materialId,
+                        pricePerUnit: newPrice.pricePerUnit || null,
+                        pricePerSheet: newPrice.pricePerSheet || null
+                    });
+                    
+                    // Обновляем список цен
+                    const updatedPrices = await getMaterialPricesByArea(selectedArea);
+                    setMaterialPrices(updatedPrices);
+                    
+                    // Сбрасываем форму
+                    setNewPrice({ materialId: '', pricePerUnit: '', pricePerSheet: '' });
+                } catch (error) {
+                    console.error('Ошибка сохранения цены:', error);
+                }
+            };
+
+            const handleDeletePrice = async (priceId) => {
+                try {
+                    await deleteMaterialPrice(priceId);
+                    setMaterialPrices(materialPrices.filter(p => p.id !== priceId));
+                } catch (error) {
+                    console.error('Ошибка удаления цены:', error);
+                }
+            };
+
+            return (
+                <div className="mt-4">
+                    <button 
+                        onClick={() => setShowMaterialPrices(!showMaterialPrices)}
+                        className="w-full text-left p-3 hover:dark:bg-dark-700 hover:bg-light-700 rounded-lg flex justify-between items-center"
+                    >
+                        <span>
+                            <i className="fas fa-tags mr-2"></i>
+                            Цены материалов
+                        </span>
+                        <i className={`fas fa-chevron-${showMaterialPrices ? 'up' : 'down'}`}></i>
+                    </button>
+
+                    {showMaterialPrices && (
+                        <div className="mt-4 space-y-4">
+                            <div className="dark:bg-dark-700 bg-light-700 p-4 rounded-lg">
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium mb-1">
+                                        Участок
+                                    </label>
+                                    <select
+                                        value={selectedArea}
+                                        onChange={(e) => setSelectedArea(e.target.value)}
+                                        className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                    >
+                                        <option value="">Выберите участок</option>
+                                        {savedAreas.map(area => (
+                                            <option key={area.id} value={area.id}>{area.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {selectedArea && (
+                                    <>
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium mb-1">
+                                                Материал
+                                            </label>
+                                            <select
+                                                value={newPrice.materialId}
+                                                onChange={(e) => setNewPrice({...newPrice, materialId: e.target.value})}
+                                                className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                            >
+                                                <option value="">Выберите материал</option>
+                                                {savedMaterials.map(material => (
+                                                    <option key={material.id} value={material.id}>{material.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 mb-4">
+                                            <div>
+                                                <label className="block text-sm font-medium mb-1">
+                                                    Цена за штуку
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    value={newPrice.pricePerUnit}
+                                                    onChange={(e) => setNewPrice({...newPrice, pricePerUnit: e.target.value})}
+                                                    className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                                    placeholder="0.00"
+                                                    step="0.01"
+                                                    min="0"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium mb-1">
+                                                    Цена за лист
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    value={newPrice.pricePerSheet}
+                                                    onChange={(e) => setNewPrice({...newPrice, pricePerSheet: e.target.value})}
+                                                    className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                                    placeholder="0.00"
+                                                    step="0.01"
+                                                    min="0"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={handleAddPrice}
+                                            className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg w-full"
+                                        >
+                                            <i className="fas fa-plus mr-2"></i>
+                                            Добавить цену
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+
+                            {selectedArea && materialPrices.length > 0 && (
+                                <div className="dark:bg-dark-700 bg-light-700 rounded-lg p-4">
+                                    <h4 className="font-medium mb-3">Текущие цены</h4>
+                                    <div className="space-y-3">
+                                        {materialPrices.map(price => {
+                                            const material = savedMaterials.find(m => m.id === price.materialId);
+                                            return (
+                                                <div key={price.id} className="flex justify-between items-center p-3 dark:bg-dark-600 bg-light-600 rounded-lg">
+                                                    <div>
+                                                        <div className="font-medium">{material?.name || 'Неизвестный материал'}</div>
+                                                        <div className="text-sm dark:text-gray-400 text-gray-600">
+                                                            {price.pricePerUnit && `Штука: ${price.pricePerUnit} ₽`}
+                                                            {price.pricePerUnit && price.pricePerSheet && ' • '}
+                                                            {price.pricePerSheet && `Лист: ${price.pricePerSheet} ₽`}
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleDeletePrice(price.id)}
+                                                        className="text-red-500 hover:text-red-400"
+                                                    >
+                                                        <i className="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         // Компонент заголовка
         function Header() {
             return (
@@ -1183,7 +1475,7 @@
                                                                                         {material.name}
                                                                                     </span>
                                                                                 </div>
-                                                                                <div className="col-span-3">{material.quantity}</div>
+                                                                                <div className="col-span-3">{material.quantity || '-'}</div>
                                                                                 <div className="col-span-3">{material.sheets || '-'}</div>
                                                                             </div>
                                                                         ))}
@@ -1213,7 +1505,7 @@
                                                                                 
                                                                                 <div className="flex justify-between items-center py-2">
                                                                                     <span className="font-medium">Количество:</span>
-                                                                                    <span>{material.quantity}</span>
+                                                                                    <span>{material.quantity || '-'}</span>
                                                                                 </div>
                                                                                 
                                                                                 <div className="h-px w-full dark:bg-dark-600 bg-light-500 my-2"></div>
@@ -1429,6 +1721,7 @@
         }) {
             const [newAreaName, setNewAreaName] = useState('');
             const [newMaterialName, setNewMaterialName] = useState('');           
+            const [showMaterialPrices, setShowMaterialPrices] = useState(false);
 
             const handleAddArea = () => {
                 if (newAreaName.trim()) {
@@ -1504,8 +1797,8 @@
                         
                         <div className="p-6">
                             <h3 className="font-medium mb-4">
-                                <i className="fas fa-compass mr-2"></i>
-                                Участки
+                                <i className="fas fa-folder-plus mr-2"></i>
+                                Управление данными
                             </h3>
                             
                             <button 
@@ -1619,6 +1912,13 @@
                                     )}
                                 </div>
                             )}
+                            <MaterialPricesSettings
+                                savedAreas={savedAreas}
+                                savedMaterials={savedMaterials}
+                                theme={theme}
+                                showMaterialPrices={showMaterialPrices}
+                                setShowMaterialPrices={setShowMaterialPrices}
+                            />
                         </div>
                     </div>
                 </div>
@@ -1748,15 +2048,6 @@ function AreaForm({
     const [selectedAreaId, setSelectedAreaId] = useState('');
     const [selectedMaterialId, setSelectedMaterialId] = useState('');
     
-    const clearMaterialName = (index) => {
-        const newMaterials = [...materials];
-        newMaterials[index] = {
-            ...newMaterials[index],
-            name: ''
-        };
-        setMaterials(newMaterials);
-    };
-    
     // При выборе сохраненного материала
     useEffect(() => {
         if (selectedMaterialId) {
@@ -1784,6 +2075,56 @@ function AreaForm({
     
     const [totalQuantity, setTotalQuantity] = useState(0);
     const [totalSheets, setTotalSheets] = useState(0);
+
+    const calculateAutoPayment = async () => {
+        if (!name) return; // Не выбран участок
+        
+        try {
+            // Находим ID участка по имени
+            const area = savedAreas.find(a => a.name === name);
+            if (!area) return;
+            
+            let total = 0;
+            let calculatedMaterials = 0;
+            
+            // Для каждого материала получаем цену и считаем
+            for (const material of materials) {
+                if (!material.name) continue;
+                
+                // Находим ID материала по имени
+                const materialObj = savedMaterials.find(m => m.name === material.name);
+                if (!materialObj) continue;
+                
+                // Получаем цену для этого материала на участке
+                const price = await getMaterialPrice(area.id, materialObj.id);
+                if (!price) continue;
+                
+                // Считаем по количеству
+                if (price.pricePerUnit && material.quantity) {
+                    total += price.pricePerUnit * parseInt(material.quantity);
+                    calculatedMaterials++;
+                }
+                
+                // Считаем по листам
+                if (price.pricePerSheet && material.sheets) {
+                    total += price.pricePerSheet * parseInt(material.sheets);
+                    calculatedMaterials++;
+                }
+            }
+            
+            // Если посчитали хотя бы для одного материала - обновляем оплату
+            if (calculatedMaterials > 0) {
+                setPayment(total.toFixed(2));
+            }
+        } catch (error) {
+            console.error('Ошибка расчета оплаты:', error);
+        }
+    };
+
+    // Вызываем при изменении материалов или участка
+    useEffect(() => {
+        calculateAutoPayment();
+    }, [materials, name]);
 
     // Функция для подсчёта итогов
     const calculateTotals = (mats) => {
