@@ -753,7 +753,7 @@
 
               // Фильтруем варианты на основе ввода
               const filteredOptions = useMemo(() => {
-                if (!inputValue) return options;
+                if (!inputValue || readonly_) return options;
                 return options.filter(item =>
                   String(item.name).toLowerCase().includes(inputValue.toLowerCase())
                 );
@@ -803,7 +803,7 @@
                   />
 
                   {showSuggestions && filteredOptions.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full dark:bg-dark-600 bg-white border dark:border-dark-500 border-light-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <div className="block z-10 mt-1 w-full dark:bg-dark-600 bg-white border dark:border-dark-500 border-light-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {filteredOptions.map((item) => (
                         <div
                           key={item.id}
@@ -973,6 +973,14 @@
              const handleAreaSelect = (areaId) => {
                 setSelectedArea(areaId);
              };
+            
+            useEffect(() => {
+                if (!showMaterialPrices) {
+                    setSelectedArea('');
+                    setMaterialPrices([]);
+                    
+                }
+            }, [showMaterialPrices]);
 
             useEffect(() => {
                 if (!selectedArea) {
@@ -1048,6 +1056,7 @@
                                         labelKey="name"
                                         valueKey="id"
                                         onSelect={handleAreaSelect}
+                                        readonly_={true}
                                     >
                                         {savedAreas.map(area => (
                                             <option key={area.id} value={area.id}>{area.name}</option>
@@ -1065,6 +1074,7 @@
                                                 labelKey="name"
                                                 valueKey="id"
                                                 onSelect={(id) => setNewPrice({...newPrice, materialId: id})}
+                                                readonly_={true}
                                             >
                                                 {savedMaterials.map(material => (
                                                     <option key={material.id} value={material.id}>{material.name}</option>
