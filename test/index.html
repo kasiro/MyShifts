@@ -40,7 +40,7 @@
     </script>
 </head>
 <body class="dark:bg-dark-900 bg-light-900 dark:text-gray-200 text-gray-800">
-    <div id="root" class="min-h-screen"></div>
+    <div id="root" class="min-h-screen pb-16"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
@@ -699,30 +699,6 @@
                 <div className="max-w-6xl mx-auto px-4 py-8">
                     <Header />
                     
-                    <div className="mt-8 flex border-b dark:border-dark-700 border-light-600">
-                        <TabButton 
-                            active={activeTab === 'shifts'} 
-                            onClick={() => setActiveTab('shifts')}
-                            icon="calendar-day"
-                        >
-                            Мои смены
-                        </TabButton>
-                        <TabButton 
-                            active={activeTab === 'stats'} 
-                            onClick={() => setActiveTab('stats')}
-                            icon="chart-bar"
-                        >
-                            Статистика
-                        </TabButton>
-                        <TabButton 
-                            active={activeTab === 'settings'} 
-                            onClick={() => setActiveTab('settings')}
-                            icon="cog"
-                        >
-                            Настройки
-                        </TabButton>
-                    </div>
-                    
                     <div className="mt-6">
                         {activeTab === 'shifts' && (
                             <ShiftsTab 
@@ -769,6 +745,38 @@
                         )}
                     </div>
                     
+                    <div className="fixed bottom-4 left-4 right-4 mx-auto max-w-md bg-light-800 rounded-2xl shadow-lg flex justify-around items-center p-2 h-16 z-10">
+                        <TabButton 
+                            active={activeTab === 'shifts'} 
+                            onClick={() => setActiveTab('shifts')}
+                            icon="list"
+                            label="Смены"
+                            theme={theme}
+                        />
+                        <TabButton 
+                            active={activeTab === 'stats'} 
+                            onClick={() => setActiveTab('stats')}
+                            icon="chart-bar"
+                            label="Статистика"
+                            theme={theme}
+                        />
+                        <TabButton 
+                            active={activeTab === 'settings'} 
+                            onClick={() => setActiveTab('settings')}
+                            icon="cog"
+                            label="Настройки"
+                            theme={theme}
+                        />
+                    </div>
+
+                    {showShiftForm && (
+                        <ShiftForm 
+                            onAdd={addShift} 
+                            onCancel={() => setShowShiftForm(false)} 
+                            theme={theme}
+                        />
+                    )}
+                    
                     {showShiftForm && (
                         <ShiftForm 
                             onAdd={addShift} 
@@ -809,17 +817,18 @@
             );
         }
         
-        // Компонент кнопки вкладки
-        function TabButton({ children, active, onClick, icon }) {
+        function TabButton({ children, active, onClick, icon, label, theme }) {
             return (
                 <button 
                     onClick={onClick}
-                    className={`px-4 py-3 font-medium text-sm flex items-center ${active 
-                        ? 'text-primary-600 border-b-2 border-primary-600' 
-                        : 'dark:text-gray-500 text-gray-600 hover:dark:text-gray-300 hover:text-gray-800'}`}
+                    className={`flex items-center justify-center px-4 py-2 rounded-2xl transition-all ${
+                        active 
+                            ? 'bg-dark-900 text-white'
+                            : 'text-gray-600'
+                    }`}
                 >
-                    <i className={`fas fa-${icon} mr-2`}></i>
-                    {children}
+                    <i className={`fas fa-${icon} text-lg ${active ? 'mr-2' : ''}`}></i>
+                    {active && <span className="text-sm font-medium">{label}</span>}
                 </button>
             );
         }
@@ -948,7 +957,7 @@
                             {/* Фильтр по участку */}
                             <div>
                                 <label className="block text-sm font-medium mb-1">
-                                    <i className="fas fa-map-marker-alt mr-2"></i>
+                                    <i className="fas fa-compass mr-2"></i>
                                     Участок
                                 </label>
                                 <input
@@ -1340,7 +1349,7 @@
                         <StatCard 
                             title="Всего участков" 
                             value={totalStats.totalAreas} 
-                            icon="map-marked-alt" 
+                            icon="compass" 
                             theme={theme}
                         />
                         <StatCard 
@@ -1495,7 +1504,7 @@
                         
                         <div className="p-6">
                             <h3 className="font-medium mb-4">
-                                <i className="fas fa-map-marked-alt mr-2"></i>
+                                <i className="fas fa-compass mr-2"></i>
                                 Участки
                             </h3>
                             
@@ -1504,7 +1513,7 @@
                                 className="w-full text-left p-3 hover:dark:bg-dark-700 hover:bg-light-700 rounded-lg flex justify-between items-center"
                             >
                                 <span>
-                                    <i className="fas fa-map-marker-alt mr-2"></i>
+                                    <i className="fas fa-compass mr-2"></i>
                                     Управление участками
                                 </span>
                                 <i className={`fas fa-chevron-${showAreaSettings ? 'up' : 'down'}`}></i>
@@ -1837,7 +1846,7 @@ function AreaForm({
                 <div className="p-6">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-bold">
-                            <i className="fas fa-map-marked-alt mr-2"></i>
+                            <i className="fas fa-compass mr-2"></i>
                             {isEditing ? 'Редактировать участок' : 'Новый участок'}
                         </h2>
                         <button onClick={onCancel} className="dark:text-gray-500 text-gray-600 hover:dark:text-gray-300 hover:text-gray-800">
@@ -1849,6 +1858,10 @@ function AreaForm({
                         <div className="space-y-4">
                             {!isEditing && savedAreas.length > 0 ? (
                                 <div>
+                                    <label className="block text-sm font-medium mb-1">
+                                        <i className="fas fa-compass mr-2"></i>
+                                        Название участка
+                                    </label>
                                     <SelectInput
                                         onChange={(name) => setName(index, name)}
                                         onSelect={handleAreaSelect}
@@ -1859,7 +1872,7 @@ function AreaForm({
                             ) : (
                                 <div>
                                     <label className="block text-sm font-medium mb-1">
-                                        <i className="fas fa-signature mr-2"></i>
+                                        <i className="fas fa-compass mr-2"></i>
                                         Название участка
                                     </label>
                                     <input 
