@@ -2112,6 +2112,8 @@ function AreaForm({
     const isEditing = areaIndex !== null;
     const areaData = isEditing ? shift.areas[areaIndex] : null;
     
+    console.log(areaData)
+
     const [name, setName] = useState(areaData?.name || '');
     const [description, setDescription] = useState(areaData?.description || '');
     const [startTime, setStartTime] = useState(areaData?.startTime || '');
