@@ -2149,13 +2149,13 @@ function AreaForm({
     const [totalSheets, setTotalSheets] = useState(0);
 
     const calculateAutoPayment = async () => {
-        console.log(name)
+        console.log('name', name)
         if (!name) return; // Не выбран участок
         
         try {
             // Находим ID участка по имени
             const area = savedAreas.find(a => a.name === name);
-            console.log(area)
+            console.log('area', area)
             if (!area) return;
             
             let total = 0;
@@ -2163,7 +2163,7 @@ function AreaForm({
             
             // Для каждого материала получаем цену и считаем
             for (const material of materials) {
-                console.log(material.name)
+                console.log('material.name', material.name)
                 if (!material.name) continue;
                 
                 // Находим ID материала по имени
@@ -2173,7 +2173,7 @@ function AreaForm({
                 
                 // Получаем цену для этого материала на участке
                 const price = await getMaterialPrice(area.id, materialObj.id);
-                console.log(price)
+                console.log('price', price)
                 if (!price) continue;
                 
                 // Считаем по количеству
