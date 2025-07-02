@@ -2283,8 +2283,8 @@ function AreaForm({
                                         Название участка
                                     </label>
                                     <SelectInput
-                                        onChange={(name) => setName(index, name)}
-                                        onSelect={handleAreaSelect}
+                                        valueKey="name"
+                                        onSelect={(name) => setName(name)}
                                         List={savedAreas}
                                         readonly_={true}
                                     />
