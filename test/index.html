@@ -858,6 +858,7 @@
                                 onDeleteArea={deleteArea}
                                 theme={theme}
                                 savedAreas={savedAreas}
+                                savedMaterials={savedMaterials}
                                 filters={filters}
                                 onFilterChange={handleFilterChange}
                                 onResetFilters={resetFilters}
@@ -1234,6 +1235,7 @@
             onDeleteArea,
             theme,
             savedAreas,
+            savedMaterials,
             filters,
             onFilterChange,
             onResetFilters,
@@ -1245,12 +1247,32 @@
             showShiftForm,
             setShowShiftForm
         }) {
+            const [materialPayments, setMaterialPayments] = useState({});
             // Форматируем дату в dd.mm.yyyy
             const formatDate = (dateString) => {
                 if (!dateString) return '';
                 const [year, month, day] = dateString.split('-');
                 return `${day}.${month}.${year}`;
             };
+
+            useEffect(() => {
+                const calculateAllPayments = async () => {
+                    const payments = {};
+                    
+                    for (const shift of shifts) {
+                        for (const area of shift.areas || []) {
+                            for (const material of area.materials || []) {
+                                const key = `${shift.id}-${area.name}-${material.name}`;
+                                payments[key] = await calculateMaterialPayment(area.name, material);
+                            }
+                        }
+                    }
+                    
+                    setMaterialPayments(payments);
+                };
+                
+                calculateAllPayments();
+            }, [shifts, savedAreas, savedMaterials]);
 
             const calculateTotals = (areas) => {
                 let totalQuantity = 0;
@@ -1264,6 +1286,41 @@
                 });
 
                 return { totalQuantity, totalSheets };
+            };
+
+            const calculateMaterialPayment = async (areaName, material) => {
+                if (!material.name || (!material.quantity && !material.sheets)) return 0;
+                
+                try {
+                    // Находим участок и материал в сохраненных
+                    console.log('ar', savedAreas)
+                    console.log('mat', savedMaterials)
+                    const area = savedAreas.find(a => a.name === areaName);
+                    const materialObj = savedMaterials.find(m => m.name === material.name);
+                    
+                    if (!area || !materialObj) return 0;
+                    
+                    // Получаем цену материала для этого участка
+                    const price = await getMaterialPrice(area.id, materialObj.id);
+                    if (!price) return 0;
+                    
+                    let payment = 0;
+                    
+                    // Считаем по количеству
+                    if (price.pricePerUnit && material.quantity) {
+                        payment += price.pricePerUnit * parseInt(material.quantity);
+                    }
+                    
+                    // Считаем по листам
+                    if (price.pricePerSheet && material.sheets) {
+                        payment += price.pricePerSheet * parseInt(material.sheets);
+                    }
+                    
+                    return payment;
+                } catch (error) {
+                    console.error('Ошибка расчета оплаты:', error);
+                    return 0;
+                }
             };
 
             const calculateShiftTotalHours = (shift) => {
@@ -1583,66 +1640,80 @@
                                                                     {/* Для компьютеров (таблица) */}
                                                                     <div className="hidden md:block w-full dark:bg-dark-700 bg-light-700 rounded-lg p-3">
                                                                         <div className="grid grid-cols-12 gap-2 text-sm font-medium dark:text-gray-400 text-gray-500 mb-2">
-                                                                            <div className="col-span-6">Название материала</div>
+                                                                            <div className="col-span-3">Название материала</div>
                                                                             <div className="col-span-3">Количество</div>
                                                                             <div className="col-span-3">Листы</div>
+                                                                            <div className="col-span-3">Оплата</div>
                                                                         </div>
                                                                         
-                                                                        {area.materials.map((material, matIndex) => (
-                                                                            <div 
-                                                                                key={matIndex} 
-                                                                                className="grid grid-cols-12 gap-2 py-2 border-b dark:border-dark-600 border-light-500 last:border-0 items-center"
-                                                                            >
-                                                                                <div className="col-span-6 min-w-0">
-                                                                                    <span className="whitespace-nowrap overflow-hidden text-ellipsis block">
-                                                                                        {material.name}
-                                                                                    </span>
+                                                                        {area.materials.map((material, matIndex) => {
+                                                                            const key = `${shift.id}-${area.name}-${material.name}`;
+                                                                            const materialPayment = materialPayments[key] || 0;
+                                                                            
+
+                                                                            return (
+                                                                                <div 
+                                                                                    key={matIndex} 
+                                                                                    className="grid grid-cols-12 gap-2 py-2 border-b dark:border-dark-600 border-light-500 last:border-0 items-center"
+                                                                                >
+                                                                                    <div className="col-span-3 min-w-0">
+                                                                                        <span className="whitespace-nowrap overflow-hidden text-ellipsis block">
+                                                                                            {material.name}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="col-span-3">{material.quantity || '-'}</div>
+                                                                                    <div className="col-span-3">{material.sheets || '-'}</div>
+                                                                                    <div className="col-span-3">
+                                                                                        {materialPayment > 0 ? `${materialPayment.toFixed(2)} ₽` : '-'}
+                                                                                    </div>
                                                                                 </div>
-                                                                                <div className="col-span-3">{material.quantity || '-'}</div>
-                                                                                <div className="col-span-3">{material.sheets || '-'}</div>
-                                                                            </div>
-                                                                        ))}
+                                                                            );
+                                                                        })}
                                                                         
                                                                         {/* Итоговая строка для компьютеров */}
                                                                         <div className="grid grid-cols-12 gap-2 py-2 pt-3 border-t-2 dark:border-dark-500 border-light-400 font-medium">
-                                                                            <div className="col-span-6">Итого:</div>
+                                                                            <div className="col-span-3">Итого:</div>
                                                                             <div className="col-span-3">{areaTotals.totalQuantity}</div>
                                                                             <div className="col-span-3">{areaTotals.totalSheets}</div>
+                                                                            <div className="col-span-3">{area.payment}</div>
                                                                         </div>
                                                                     </div>
                                                                     
                                                                     {/* Для мобильных (карточки) */}
                                                                     <div className="md:hidden space-y-3">
-                                                                        {area.materials.map((material, matIndex) => (
-                                                                            <div 
-                                                                                key={matIndex} 
-                                                                                className="dark:bg-dark-700 bg-light-700 rounded-lg p-4"
-                                                                            >
-                                                                                <div className="flex justify-between items-center pb-2">
-                                                                                    <span className="text-right whitespace-nowrap">
-                                                                                        {material.name}
-                                                                                    </span>
+                                                                        {area.materials.map((material, matIndex) => {
+                                                                            const key = `${shift.id}-${area.name}-${material.name}`;
+                                                                            const materialPayment = materialPayments[key] || 0;
+
+                                                                            return (
+                                                                                <div 
+                                                                                    key={matIndex} 
+                                                                                    className="dark:bg-dark-700 bg-light-700 rounded-lg p-4"
+                                                                                >
+                                                                                    <div className="flex justify-between items-center pb-2">
+                                                                                        <span className="text-right whitespace-nowrap">
+                                                                                            {material.name}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="flex justify-between items-center py-2">
+                                                                                        <span className="font-medium">Количество</span>
+                                                                                        <span>{material.quantity || '-'}</span>
+                                                                                    </div>
+                                                                                    <div className="flex justify-between items-center pt-2">
+                                                                                        <span className="font-medium">Листы</span>
+                                                                                        <span>{material.sheets || '-'}</span>
+                                                                                    </div>
+                                                                                    <div className="flex justify-between items-center pt-2">
+                                                                                        <span className="font-medium">Оплата</span>
+                                                                                        <span>{materialPayment > 0 ? `${materialPayment.toFixed(2)} ₽` : '-'}</span>
+                                                                                    </div>
                                                                                 </div>
-                                                                                
-                                                                                <div className="h-px w-full dark:bg-dark-600 bg-light-500 my-2"></div>
-                                                                                
-                                                                                <div className="flex justify-between items-center py-2">
-                                                                                    <span className="font-medium">Количество:</span>
-                                                                                    <span>{material.quantity || '-'}</span>
-                                                                                </div>
-                                                                                
-                                                                                <div className="h-px w-full dark:bg-dark-600 bg-light-500 my-2"></div>
-                                                                                
-                                                                                <div className="flex justify-between items-center pt-2">
-                                                                                    <span className="font-medium">Листы:</span>
-                                                                                    <span>{material.sheets || '-'}</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        ))}
+                                                                            );
+                                                                        })}
                                                                         
-                                                                        <div className="flex justify-between mt-3 pt-2 border-t dark:border-dark-600 border-light-500">
+                                                                        <div className="flex justify-around mt-3 pt-2">
                                                                             <span className="text-sm font-medium dark:text-gray-400 text-gray-500">
-                                                                                Итого по участку:
+                                                                                Итого:
                                                                             </span>
                                                                             <div className="flex gap-4">
                                                                                 <span className="text-sm">
