@@ -276,6 +276,7 @@
             const filterTimeoutRef = useRef(null);
             const [savedMaterials, setSavedMaterials] = useState([]);
             const [showMaterialSettings, setShowMaterialSettings] = useState(false);
+            const [currentShift, setCurrentShift] = useState(null);
 
             // Добавление нового материала в настройки
             const addSavedMaterial = async (material) => {
@@ -568,6 +569,18 @@
                     console.error('Failed to save shift:', error);
                 }
             };
+
+            const updateShift = async (updatedShift) => {
+                try {
+                    await saveData('shifts', updatedShift);
+                    setShifts(shifts.map(s => s.id === updatedShift.id ? updatedShift : s));
+                    setShowShiftForm(false);
+                    setCurrentShift(null);
+                } catch (error) {
+                    console.log(updatedShift)
+                    console.error('Failed to update shift:', error);
+                }
+            };
             
             // Добавление участка к смене
             const addAreaToShift = async (shiftId, newArea) => {
@@ -827,7 +840,10 @@
                         {activeTab === 'shifts' && (
                             <ShiftsTab 
                                 shifts={filteredShifts} 
-                                onAddShift={() => setShowShiftForm(true)}
+                                onAddShift={() => {
+                                    setShowShiftForm(true)
+                                    setCurrentShift(null)
+                                }}
                                 onAddArea={(shiftId) => {
                                     setCurrentShiftId(shiftId);
                                     setCurrentAreaIndex(null);
@@ -848,6 +864,10 @@
                                 isFiltering={isFiltering}
                                 isFilteringNow={isFilteringNow}
                                 formatHoursToHMM={formatHoursToHMM}
+                                currentShift={currentShift}
+                                setCurrentShift={setCurrentShift}
+                                showShiftForm={showShiftForm}
+                                setShowShiftForm={setShowShiftForm}
                             />
                         )}
                         {activeTab === 'stats' && <StatsTab shifts={shifts} theme={theme} />}
@@ -896,16 +916,13 @@
 
                     {showShiftForm && (
                         <ShiftForm 
-                            onAdd={addShift} 
-                            onCancel={() => setShowShiftForm(false)} 
-                            theme={theme}
-                        />
-                    )}
-                    
-                    {showShiftForm && (
-                        <ShiftForm 
-                            onAdd={addShift} 
-                            onCancel={() => setShowShiftForm(false)} 
+                            shift={currentShift}
+                            onAdd={addShift}
+                            onUpdate={updateShift}
+                            onCancel={() => {
+                                setShowShiftForm(false);
+                                setCurrentShift(null);
+                            }} 
                             theme={theme}
                         />
                     )}
@@ -969,6 +986,13 @@
                 const area = savedAreas.find(a => a.id === selectedArea);
                 return area ? area.name : '';
             }, [selectedArea, savedAreas]);
+
+            const availableMaterials = useMemo(() => {
+                if (!selectedArea) return savedMaterials;
+                
+                const pricedMaterialIds = materialPrices.map(p => p.materialId);
+                return savedMaterials.filter(material => !pricedMaterialIds.includes(material.id));
+            }, [selectedArea, savedMaterials, materialPrices]);
 
              const handleAreaSelect = (areaId) => {
                 setSelectedArea(areaId);
@@ -1071,63 +1095,67 @@
                                                 Материал
                                             </label>
                                             <SelectInput 
+                                                value={newPrice.materialId ? 
+                                                    savedMaterials.find(m => m.id === newPrice.materialId)?.name || '' 
+                                                    : ''}
                                                 labelKey="name"
                                                 valueKey="id"
                                                 onSelect={(id) => setNewPrice({...newPrice, materialId: id})}
                                                 readonly_={true}
+                                                placeholder_={availableMaterials.length === 0 ? 
+                                                    "Все материалы уже имеют цены" : "Выберите материал"}
+                                                disabled={availableMaterials.length === 0}
                                             >
-                                                {savedMaterials.map(material => (
+                                                {availableMaterials.map(material => (
                                                     <option key={material.id} value={material.id}>{material.name}</option>
                                                 ))}
                                             </SelectInput>
-                                            {/*
-                                            <select
-                                                value={newPrice.materialId}
-                                                onChange={(e) => setNewPrice({...newPrice, materialId: e.target.value})}
-                                                className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
-                                            >
-                                                <option value="">Выберите материал</option>
-                                                {savedMaterials.map(material => (
-                                                    <option key={material.id} value={material.id}>{material.name}</option>
-                                                ))}
-                                            </select>
-                                            */}
+                                            {availableMaterials.length === 0 && (
+                                                <p className="text-sm text-gray-500 mt-1">
+                                                    Все материалы уже имеют цены для этого участка
+                                                </p>
+                                            )}
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-4 mb-4">
-                                            <div>
-                                                <label className="block text-sm font-medium mb-1">
-                                                    Цена за штуку
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    value={newPrice.pricePerUnit}
-                                                    onChange={(e) => setNewPrice({...newPrice, pricePerUnit: e.target.value})}
-                                                    className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium mb-1">
-                                                    Цена за лист
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    value={newPrice.pricePerSheet}
-                                                    onChange={(e) => setNewPrice({...newPrice, pricePerSheet: e.target.value})}
-                                                    className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                        </div>
+                                        {newPrice.materialId && (
+                                            <>
+                                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium mb-1">
+                                                            Цена за штуку
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            value={newPrice.pricePerUnit}
+                                                            onChange={(e) => setNewPrice({...newPrice, pricePerUnit: e.target.value})}
+                                                            className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                                            placeholder="0.00"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium mb-1">
+                                                            Цена за лист
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            value={newPrice.pricePerSheet}
+                                                            onChange={(e) => setNewPrice({...newPrice, pricePerSheet: e.target.value})}
+                                                            className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                                            placeholder="0.00"
+                                                        />
+                                                    </div>
+                                                </div>
 
-                                        <button
-                                            onClick={handleAddPrice}
-                                            className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg w-full"
-                                        >
-                                            <i className="fas fa-plus mr-2"></i>
-                                            Добавить цену
-                                        </button>
+                                                <button
+                                                    onClick={handleAddPrice}
+                                                    className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg w-full"
+                                                    disabled={!newPrice.materialId}
+                                                >
+                                                    <i className="fas fa-plus mr-2"></i>
+                                                    Добавить цену
+                                                </button>
+                                            </>
+                                        )}
                                     </>
                                 )}
                             </div>
@@ -1211,7 +1239,11 @@
             onResetFilters,
             isFiltering,
             isFilteringNow,
-            formatHoursToHMM
+            formatHoursToHMM,
+            currentShift,
+            setCurrentShift,
+            showShiftForm,
+            setShowShiftForm
         }) {
             // Форматируем дату в dd.mm.yyyy
             const formatDate = (dateString) => {
@@ -1413,7 +1445,6 @@
                                         className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
                                         placeholder="Мин"
                                         min="0"
-                                        step="0.01"
                                     />
                                     <input
                                         type="number"
@@ -1422,7 +1453,6 @@
                                         className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
                                         placeholder="Макс"
                                         min="0"
-                                        step="0.01"
                                     />
                                 </div>
                             </div>
@@ -1463,38 +1493,60 @@
                         <div className="space-y-4">
                             {shifts.map(shift => (
                                 <div key={shift.id} className="dark:bg-dark-800 bg-light-800 rounded-xl overflow-hidden shadow">
-                                    <div className="flex justify-between items-center px-6 pt-6">
-                                        <div>
-                                            <h3 className="text-lg font-bold">{formatDate(shift.date)}</h3>
-                                            {shift.areas?.length > 0 && (
-                                                <>
-                                                    <p className="text-sm text-gray-400 mt-1">
-                                                        Смена: {calculateShiftTotalHours(shift).start} - {calculateShiftTotalHours(shift).end} <br />
-                                                        Всего: {formatHoursToHMM(parseFloat(calculateShiftTotalHours(shift).total))}
-                                                    </p>
-                                                    {shift.lunchStart && shift.lunchEnd && (
-                                                        <p className="text-sm text-gray-400">
-                                                            Обед: {shift.lunchStart} - {shift.lunchEnd}
-                                                        </p>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                            <div className="flex items-center gap-3">
+                                    <div className="flex flex-col items-start px-6 pt-6">
+                                        <div className="w-full">
+                                            <div className="flex justify-between items-start">
+                                                <h3 className="text-lg font-bold">{formatDate(shift.date)}</h3>
                                                 <button 
-                                                    onClick={() => onAddArea(shift.id)}
-                                                className="mr-2 dark:bg-primary bg-primary text-white px-4 py-2 rounded-lg text-sm flex items-center"
-                                            >
-                                                <i className="fas fa-plus mr-2"></i>
-                                                Участок
-                                            </button>
-                                            <button 
-                                                onClick={() => onDeleteShift(shift.id)}
-                                                className="text-red-500"
-                                            >
-                                                <i className="fas fa-times"></i>
-                                            </button>
+                                                    onClick={() => onDeleteShift(shift.id)}
+                                                    className="p-2 text-red-500 font-medium"
+                                                >
+                                                    <i className="fas fa-times"></i>
+                                                </button>
+                                            </div>
+
+                                            <>
+                                                {shift.areas?.length > 0 && (
+                                                    <div>
+                                                        <p className="text-sm text-gray-400 mt-1">
+                                                            Смена: {calculateShiftTotalHours(shift).start} - {calculateShiftTotalHours(shift).end} <br />
+                                                            Всего: {formatHoursToHMM(parseFloat(calculateShiftTotalHours(shift).total))}
+                                                        </p>
+                                                        {shift.lunchStart && shift.lunchEnd && (
+                                                            <p className="text-sm text-gray-400">
+                                                                Обед: {shift.lunchStart} - {shift.lunchEnd}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {shift.penalty > 0 && (
+                                                    <p className="text-sm text-red-500 mt-1">
+                                                        Штраф: {shift.penalty}
+                                                    </p>
+                                                )}
+                                            </>
                                         </div>
+                                            <div className="flex items-center gap-3 w-full">
+                                                <div className="flex gap-3 mt-2 justify-center w-full">
+                                                    <button 
+                                                        onClick={() => {
+                                                            setCurrentShift(shift);
+                                                            setShowShiftForm(true);
+                                                        }}
+                                                        className="flex-1 dark:bg-dark-600 p-2 bg-light-600 rounded-lg text-sm"
+                                                    >
+                                                        <i className="fas fa-pen mr-2"></i>
+                                                        Изменить
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => onAddArea(shift.id)}
+                                                        className="flex-1 dark:bg-primary bg-primary text-white px-2 py-2 rounded-lg text-sm"
+                                                    >
+                                                    <i className="fas fa-plus mr-2"></i>
+                                                    Участок
+                                                    </button>
+                                                </div>
+                                            </div>
                                     </div>
                                     
                                     {shift.areas?.length > 0 ? (
@@ -1670,20 +1722,23 @@
              const totalStats = shifts.reduce((acc, shift) => {
                 const shiftEarnings = shift.areas?.reduce((sum, area) => sum + area.payment, 0) || 0;
                 const shiftHours = shift.areas?.reduce((sum, area) => sum + parseFloat(area.workHours), 0) || 0;
-        
+                const shiftPenalty = shift.penalty || 0;
+                
                 return {
-                    totalEarnings: acc.totalEarnings + shiftEarnings,
+                    totalEarnings: acc.totalEarnings + shiftEarnings - shiftPenalty,
                     totalHours: acc.totalHours + shiftHours,
                     totalShifts: acc.totalShifts + 1,
                     totalAreas: acc.totalAreas + (shift.areas?.length || 0),
-                    totalLunchHours: acc.totalLunchHours + (shift.areas?.length > 0 ? 1 : 0) // Учитываем 1 обед на смену
+                    totalLunchHours: acc.totalLunchHours + (shift.areas?.length > 0 ? 1 : 0),
+                    totalPenalty: acc.totalPenalty + shiftPenalty
                 };
             }, {
                 totalEarnings: 0,
                 totalHours: 0,
                 totalShifts: 0,
                 totalAreas: 0,
-                totalLunchHours: 0
+                totalLunchHours: 0,
+                totalPenalty: 0
             });
 
             const formatDate = (dateString) => {
@@ -1719,6 +1774,12 @@
                             title="Общий заработок" 
                             value={`${totalStats.totalEarnings.toFixed(2)} ₽`} 
                             icon="money-bill-wave" 
+                            theme={theme}
+                        />
+                        <StatCard 
+                            title="Общий штраф" 
+                            value={`${totalStats.totalPenalty.toFixed(2)} ₽`} 
+                            icon="exclamation-triangle" 
                             theme={theme}
                         />
                     </div>
@@ -1813,7 +1874,7 @@
                     setNewMaterialName('');
                 }
             };
-            
+
             return (
                 <div>
                     <h2 className="text-xl font-bold mb-6">
@@ -1999,18 +2060,40 @@
         }
         
         // Компонент формы добавления смены
-        function ShiftForm({ onAdd, onCancel, theme }) {
-            const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-            const [lunchStart, setLunchStart] = useState('12:00'); // По умолчанию обед с 12:00
-            const [lunchEnd, setLunchEnd] = useState('13:00');   // до 13:00
+        function ShiftForm({
+            shift,
+            onAdd,
+            onUpdate,
+            onCancel,
+            theme
+        }) {
+            const isEditing = shift != null;
+            const [date, setDate] = useState(shift?.date || new Date().toISOString().split('T')[0]);
+            const [lunchStart, setLunchStart] = useState(shift?.lunchStart || '12:00');
+            const [lunchEnd, setLunchEnd] = useState(shift?.lunchEnd || '13:00');
+            const [penalty, setPenalty] = useState(shift?.penalty || '');
 
             const handleSubmit = (e) => {
                 e.preventDefault();
-                onAdd({
+                const shiftData = {
                     date,
                     lunchStart,
-                    lunchEnd
-                });
+                    lunchEnd,
+                    penalty: penalty ? parseFloat(penalty) : 0,
+                    areas: shift?.areas || []
+                };
+                
+                if (isEditing) {
+                    onUpdate({
+                        ...shift,
+                        ...shiftData
+                    });
+                } else {
+                    onAdd({
+                        ...shiftData,
+                        id: Date.now().toString()
+                    });
+                }
             };
             
             return (
@@ -2020,7 +2103,7 @@
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-xl font-bold">
                                     <i className="fas fa-plus-circle mr-2"></i>
-                                    Новая смена
+                                    {isEditing ? 'Редактировать смену' : 'Новая смена'}
                                 </h2>
                                 <button onClick={onCancel} className="dark:text-gray-500 text-gray-600 hover:dark:text-gray-300 hover:text-gray-800">
                                     <i className="fas fa-times"></i>
@@ -2030,46 +2113,61 @@
                             <form onSubmit={handleSubmit}>
                                 <div className="space-y-4">
                                     <div>
-                                <label className="block text-sm font-medium mb-1">
-                                    <i className="fas fa-calendar-day mr-2"></i>
-                                    Дата
-                                </label>
-                                <input 
-                                    type="date" 
-                                    value={date}
-                                    onChange={(e) => setDate(e.target.value)}
-                                    className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
-                                    required
-                                />
-                            </div>
-                            
-                            {/* Поля времени обеда */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">
-                                        <i className="fas fa-utensils mr-2"></i>
-                                        Обед с
-                                    </label>
-                                    <input 
-                                        type="time" 
-                                        value={lunchStart}
-                                        onChange={(e) => setLunchStart(e.target.value)}
-                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">
-                                        <i className="fas fa-utensils mr-2"></i>
-                                        Обед до
-                                    </label>
-                                    <input 
-                                        type="time" 
-                                        value={lunchEnd}
-                                        onChange={(e) => setLunchEnd(e.target.value)}
-                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
-                                    />
-                                </div>
-                            </div>
+                                        <label className="block text-sm font-medium mb-1">
+                                            <i className="fas fa-calendar-day mr-2"></i>
+                                            Дата
+                                        </label>
+                                        <input 
+                                            type="date" 
+                                            value={date}
+                                            onChange={(e) => setDate(e.target.value)}
+                                            className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                            required
+                                        />
+                                    </div>
+                                    
+                                    {/* Поля времени обеда */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">
+                                                <i className="fas fa-utensils mr-2"></i>
+                                                Обед с
+                                            </label>
+                                            <input 
+                                                type="time" 
+                                                value={lunchStart}
+                                                onChange={(e) => setLunchStart(e.target.value)}
+                                                className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">
+                                                <i className="fas fa-utensils mr-2"></i>
+                                                Обед до
+                                            </label>
+                                            <input 
+                                                type="time" 
+                                                value={lunchEnd}
+                                                onChange={(e) => setLunchEnd(e.target.value)}
+                                                className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Поле штрафа */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">
+                                            <i className="fas fa-exclamation-triangle mr-2"></i>
+                                            Штраф
+                                        </label>
+                                        <input 
+                                            type="number" 
+                                            value={penalty}
+                                            onChange={(e) => setPenalty(e.target.value)}
+                                            className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary-600"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
                                     
                                     <div className="flex gap-3 pt-4">
                                         <button
@@ -2085,7 +2183,7 @@
                                             className="flex-1 bg-primary-600 hover:bg-primary-700 py-3 rounded-lg flex items-center justify-center text-white"
                                         >
                                             <i className="fas fa-check mr-2"></i>
-                                            Создать
+                                            {isEditing ? 'Сохранить' : 'Создать'}
                                         </button>
                                     </div>
                                 </div>
@@ -2095,7 +2193,6 @@
                 </div>
             );
         }
-        
 // Компонент формы добавления/редактирования участка
 function AreaForm({
     shiftId,
@@ -2112,8 +2209,6 @@ function AreaForm({
     const isEditing = areaIndex !== null;
     const areaData = isEditing ? shift.areas[areaIndex] : null;
     
-    console.log(areaData)
-
     const [name, setName] = useState(areaData?.name || '');
     const [description, setDescription] = useState(areaData?.description || '');
     const [startTime, setStartTime] = useState(areaData?.startTime || '');
@@ -2151,13 +2246,11 @@ function AreaForm({
     const [totalSheets, setTotalSheets] = useState(0);
 
     const calculateAutoPayment = async () => {
-        console.log('name', name)
         if (!name) return; // Не выбран участок
         
         try {
             // Находим ID участка по имени
             const area = savedAreas.find(a => a.name === name);
-            console.log('area', area)
             if (!area) return;
             
             let total = 0;
@@ -2165,17 +2258,14 @@ function AreaForm({
             
             // Для каждого материала получаем цену и считаем
             for (const material of materials) {
-                console.log('material.name', material.name)
                 if (!material.name) continue;
                 
                 // Находим ID материала по имени
                 const materialObj = savedMaterials.find(m => m.name === material.name);
-                console.log('obj', materialObj)
                 if (!materialObj) continue;
                 
                 // Получаем цену для этого материала на участке
                 const price = await getMaterialPrice(area.id, materialObj.id);
-                console.log('price', price)
                 if (!price) continue;
                 
                 // Считаем по количеству
