@@ -1249,10 +1249,16 @@
         }) {
             const [materialPayments, setMaterialPayments] = useState({});
             // Форматируем дату в dd.mm.yyyy
+            // В компоненте ShiftsTab добавим новую функцию
             const formatDate = (dateString) => {
-                if (!dateString) return '';
-                const [year, month, day] = dateString.split('-');
-                return `${day}.${month}.${year}`;
+              if (!dateString) return '';
+              
+              const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+              const [year, month, day] = dateString.split('-');
+              const date = new Date(year, month - 1, day);
+              const dayOfWeek = days[date.getDay()];
+              
+              return `${day}.${month}.${year} (${dayOfWeek})`;
             };
 
             useEffect(() => {
@@ -1293,8 +1299,6 @@
                 
                 try {
                     // Находим участок и материал в сохраненных
-                    console.log('ar', savedAreas)
-                    console.log('mat', savedMaterials)
                     const area = savedAreas.find(a => a.name === areaName);
                     const materialObj = savedMaterials.find(m => m.name === material.name);
                     
@@ -1567,7 +1571,7 @@
                                                     <div>
                                                         <p className="text-sm text-gray-400 mt-1">
                                                             Смена: {calculateShiftTotalHours(shift).start} - {calculateShiftTotalHours(shift).end} <br />
-                                                            Всего: {formatHoursToHMM(parseFloat(calculateShiftTotalHours(shift).total))}
+                                                            Всего: {calculateShiftTotalHours(shift).total} ч
                                                         </p>
                                                         {shift.lunchStart && shift.lunchEnd && (
                                                             <p className="text-sm text-gray-400">
@@ -1787,35 +1791,116 @@
             );
         }
         
+        function ShiftItem({ shift, theme, formatDate }) {
+          const totalPayment = shift.areas?.reduce((sum, area) => sum + area.payment, 0);
+          const totalHours = shift.areas?.reduce((sum, area) => sum + parseFloat(area.workHours), 0) || 0;
+
+          return (
+            <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-700'}`}>
+              <div className={`flex flex-col`}>
+                <div>
+                  <div className="font-medium flex justify-between">
+                    {formatDate(shift.date)} - {totalHours.toFixed(0)}/ч
+                    <span>участки</span>
+                  </div>
+                  {shift.areas.length > 0 && (
+                      <div className="w-full text-sm p-2 flex flex-col font-bold items-center text-gray-500">
+                        <div className="w-full flex flex-col gap-2 items-center">
+                        {shift.areas?.map((area, index) => (
+                            <div className="flex w-full">
+                                <div className="w-full flex bg-light-600 justify-between dark:bg-dark-600 p-2 rounded-lg text-center">
+                                    <div>{area.name}:</div>
+                                    <div className={`${area.payment === 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                      {area.payment === 0 ? 'Не оплачено' : `${area.payment} ₽`}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        </div>
+                      </div>
+                  )}
+                </div>
+                <div className={`font-medium ${totalPayment === 0 ? 'text-red-500' : 'text-green-500'}`}>
+                  {totalPayment === 0 ? 'Не оплачено' : `${totalPayment} ₽`}
+                </div>
+              </div>
+            </div>
+          );
+        }
+
         // Компонент вкладки "Статистика"
         function StatsTab({ shifts, theme }) {
             // Расчет общей статистики
-             const totalStats = shifts.reduce((acc, shift) => {
-                const shiftEarnings = shift.areas?.reduce((sum, area) => sum + area.payment, 0) || 0;
-                const shiftHours = shift.areas?.reduce((sum, area) => sum + parseFloat(area.workHours), 0) || 0;
-                const shiftPenalty = shift.penalty || 0;
+            const [showUnpaid, setShowUnpaid] = useState(false);
+
+            const calculateShiftTotalHours = (shift) => {
+                if (!shift.areas || shift.areas.length === 0) return null;
+                
+                // Находим самое раннее начало и самый поздний конец среди всех участков
+                const startTimes = shift.areas.map(area => area.startTime);
+                const endTimes = shift.areas.map(area => area.endTime);
+                
+                const earliestStart = startTimes.reduce((earliest, current) => 
+                    current < earliest ? current : earliest);
+                const latestEnd = endTimes.reduce((latest, current) => 
+                    current > latest ? current : latest);
+                
+                // Вычисляем общее время смены
+                const totalHours = calculateWorkHours(
+                    earliestStart, 
+                    latestEnd, 
+                    shift.lunchStart || '12:00', 
+                    shift.lunchEnd || '13:00'
+                );
                 
                 return {
-                    totalEarnings: acc.totalEarnings + shiftEarnings - shiftPenalty,
-                    totalHours: acc.totalHours + shiftHours,
-                    totalShifts: acc.totalShifts + 1,
-                    totalAreas: acc.totalAreas + (shift.areas?.length || 0),
-                    totalLunchHours: acc.totalLunchHours + (shift.areas?.length > 0 ? 1 : 0),
-                    totalPenalty: acc.totalPenalty + shiftPenalty
+                    start: earliestStart,
+                    end: latestEnd,
+                    total: totalHours
                 };
+            };
+
+            const totalStats = shifts.reduce((acc, shift) => {
+              const shiftEarnings = shift.areas?.reduce((sum, area) => sum + area.payment, 0) || 0;
+              const shiftHours = shift.areas?.length 
+                ? calculateShiftTotalHours(shift).total // Уже целые часы
+                : 0;
+              const shiftPenalty = shift.penalty || 0;
+              const isUnpaid = shiftEarnings === 0;
+              
+              return {
+                totalEarnings: acc.totalEarnings + shiftEarnings - shiftPenalty,
+                totalHours: acc.totalHours + shiftHours, // Только целые часы
+                totalShifts: acc.totalShifts + 1,
+                totalAreas: acc.totalAreas + (shift.areas?.length || 0),
+                totalPenalty: acc.totalPenalty + shiftPenalty,
+                totalUnpaid: acc.totalUnpaid + (isUnpaid ? 1 : 0)
+              };
             }, {
                 totalEarnings: 0,
                 totalHours: 0,
                 totalShifts: 0,
                 totalAreas: 0,
-                totalLunchHours: 0,
-                totalPenalty: 0
+                totalPenalty: 0,
+                totalUnpaid: 0
             });
 
+            const filteredShifts = showUnpaid
+            ? shifts.filter(shift => {
+                const payment = shift.areas?.reduce((sum, area) => sum + area.payment, 0) || 0;
+                return payment === 0;
+              })
+            : shifts.slice(0, 5);
+
             const formatDate = (dateString) => {
-                if (!dateString) return '';
-                const [year, month, day] = dateString.split('-');
-                return `${day}.${month}.${year}`;
+              if (!dateString) return '';
+              
+              const daysShort = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+              const [year, month, day] = dateString.split('-');
+              const date = new Date(year, month - 1, day);
+              const dayOfWeek = daysShort[date.getDay()];
+              
+              return `${day}.${month}.${year} (${dayOfWeek})`;
             };
 
             return (
@@ -1831,7 +1916,7 @@
                         />
                         <StatCard 
                             title="Всего часов" 
-                            value={totalStats.totalHours.toFixed(2)} 
+                            value={totalStats.totalHours} 
                             icon="clock" 
                             theme={theme}
                         />
@@ -1843,9 +1928,15 @@
                         />
                         <StatCard 
                             title="Общий заработок" 
-                            value={`${totalStats.totalEarnings.toFixed(2)} ₽`} 
+                            value={`${totalStats.totalEarnings.toFixed(0)} ₽`} 
                             icon="money-bill-wave" 
                             theme={theme}
+                        />
+                        <StatCard 
+                          title="Смен без оплаты" 
+                          value={totalStats.totalUnpaid}
+                          icon="sack-xmark" 
+                          theme={theme}
                         />
                         <StatCard 
                             title="Общий штраф" 
@@ -1854,36 +1945,40 @@
                             theme={theme}
                         />
                     </div>
-                    
+
                     <div className="dark:bg-dark-800 bg-light-800 rounded-xl p-6 shadow">
-                        <h3 className="font-medium mb-4">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-medium">
                             <i className="fas fa-history mr-2"></i>
-                            Последние смены
-                        </h3>
-                        {shifts.length > 0 ? (
-                            <div className="space-y-4">
-                                {shifts.slice(0, 5).map(shift => (
-                                    <div key={shift.id} className="flex justify-between items-center dark:bg-dark-700 bg-light-700 p-4 rounded-lg">
-                                        <div>
-                                            <div className="font-medium">
-                                                <i className="fas fa-calendar-day mr-2"></i>
-                                                {formatDate(shift.date)}
-                                            </div>
-                                            <div className="text-sm dark:text-gray-400 text-gray-600">
-                                                {shift.areas?.length || 0} участков, {formatHoursToHMM(shift.areas?.reduce((sum, area) => sum + parseFloat(area.workHours), 0) || 0)}
-                                            </div>
-                                        </div>
-                                        <div className="text-green-500 font-medium">
-                                            {shift.areas?.reduce((sum, area) => sum + area.payment, 0).toFixed(2)} ₽
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            {showUnpaid ? 'Смены без оплаты' : 'Последние смены'}
+                          </h3>
+                          <label className="flex items-center space-x-2">
+                            <span className="text-sm">Только без оплаты</span>
+                            <input 
+                              type="checkbox" 
+                              checked={showUnpaid}
+                              onChange={() => setShowUnpaid(!showUnpaid)}
+                              className={`h-4 w-4 rounded ${theme === 'dark' ? 'bg-dark-600 border-dark-500' : 'bg-white border-gray-300'} text-primary-600 focus:ring-primary-500`}
+                            />
+                          </label>
+                        </div>
+                        
+                        {filteredShifts.length > 0 ? (
+                          <div className="space-y-3">
+                            {filteredShifts.map(shift => (
+                              <ShiftItem
+                                key={shift.id}
+                                formatDate={formatDate}
+                                shift={shift}
+                                theme={theme}
+                              />
+                            ))}
+                          </div>
                         ) : (
-                            <div className="text-center dark:text-gray-500 text-gray-600 py-8">
-                                <i className="fas fa-database mr-2"></i>
-                                Нет данных для отображения
-                            </div>
+                          <div className={`text-center py-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'}`}>
+                            <i className="fas fa-database mr-2"></i>
+                            {showUnpaid ? 'Нет смен без оплаты' : 'Нет данных'}
+                          </div>
                         )}
                     </div>
                 </div>
@@ -1989,7 +2084,7 @@
                                             checked={theme === 'dark'}
                                             onChange={() => toggleTheme(theme === 'dark' ? 'light' : 'dark')}
                                         />
-                                        <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[1.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                                        <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[1.5px] after:bg-white after:border-gray-300 after:transition-all after:border after:rounded-full after:h-5 after:w-5 dark:border-gray-600 peer-checked:bg-primary-600"></div>
                                     </label>
                                 </div>
                                 <button className="w-full text-left p-3 hover:dark:bg-dark-700 hover:bg-light-700 rounded-lg">
@@ -2654,26 +2749,24 @@ function AreaForm({
 }
         
         const calculateWorkHours = (startTime, endTime, lunchStart, lunchEnd) => {
-            if (!startTime || !endTime) return 0;
-            
-            const start = new Date(`2000-01-01T${startTime}`);
-            const end = new Date(`2000-01-01T${endTime}`);
-            const lunchS = new Date(`2000-01-01T${lunchStart}`);
-            const lunchE = new Date(`2000-01-01T${lunchEnd}`);
-            
-            // Корректировка если смена переходит через полночь
-            if (end < start) end.setDate(end.getDate() + 1);
-            if (lunchE < lunchS) lunchE.setDate(lunchE.getDate() + 1);
-            
-            let totalMs = end - start;
-            
-            // Проверяем полностью ли охватывается обеденное время
-            if (start <= lunchS && end >= lunchE) {
-                const lunchDuration = lunchE - lunchS;
-                totalMs -= Math.max(0, lunchDuration);
-            }
-            
-            return (totalMs / (1000 * 60 * 60)).toFixed(2);
+          if (!startTime || !endTime) return 0;
+          
+          const start = new Date(`2000-01-01T${startTime}`);
+          const end = new Date(`2000-01-01T${endTime}`);
+          const lunchS = new Date(`2000-01-01T${lunchStart}`);
+          const lunchE = new Date(`2000-01-01T${lunchEnd}`);
+          
+          if (end < start) end.setDate(end.getDate() + 1);
+          if (lunchE < lunchS) lunchE.setDate(lunchE.getDate() + 1);
+          
+          let totalMs = end - start;
+          
+          if (start <= lunchS && end >= lunchE) {
+            totalMs -= (lunchE - lunchS);
+          }
+          
+          // Возвращаем целые часы (без минут)
+          return Math.floor(totalMs / (1000 * 60 * 60));
         };
         
         // Рендерим приложение
