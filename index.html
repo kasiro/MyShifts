@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#a16ff7">
   <title>Мои смены</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -1182,7 +1183,7 @@ useEffect(() => {
       .sort((a, b) => a.taskDate - b.taskDate);
 
     if (paymentByDate.length === 0) {
-      console.log('Нет данных для построения графика в выбранном диапазоне.');
+      // console.log('Нет данных для построения графика в выбранном диапазоне.');
       const ctx = chartRef.current.getContext('2d');
       ctx.font = '14px Inter';
       ctx.fillStyle = '#64748b';
@@ -1273,7 +1274,6 @@ useEffect(() => {
 
 
       const openModal = (task = null) => {
-        console.log('Открытие модального окна...');
         if (task) {
           setEditingTask(task);
           let materialsToEdit = [];
@@ -1333,7 +1333,7 @@ useEffect(() => {
       };
 
       const closeModal = () => {
-        console.log('Закрытие модального окна...');
+        // console.log('Закрытие модального окна...');
         setShowModal(false);
         setEditingTask(null);
       };
@@ -1437,7 +1437,7 @@ useEffect(() => {
 };
 
       const deleteTask = (id) => {
-        console.log('Удаление задачи с id:', id);
+        // console.log('Удаление задачи с id:', id);
         setTasks(tasks.filter(t => t.id !== id));
       };
 
@@ -1591,9 +1591,7 @@ const filterTasks = (tasksToFilter) => {
     
     // Фильтр по материалу
     if (filters.material) {
-      if (filters.material === 'Все материалы') {
-
-      } else {
+      if (filters.material !== 'Все материалы') {
           const hasMaterial = (task.materials?.some(m => m.material === filters.material) || (
                              task.material === filters.material || (
                                task.materials?.some(m => m.material.includes(filters.material))
@@ -1651,9 +1649,6 @@ const [dateRange, setDateRange] = useState(() => {
     new Date(currentYear, currentMonth, 25) : 
     new Date(currentYear, currentMonth + 1, 25);
   
-  console.log('start:', startDate.toISOString().split('T')[0])
-  console.log('end:', endDate.toISOString().split('T')[0])
-
   return {
     start: startDate.toISOString().split('T')[0],
     end: endDate.toISOString().split('T')[0]
@@ -2035,11 +2030,12 @@ const DropCategory = ({
   return (
     <div className="dropdown" ref={dropdownRef}>
       <button 
-        className="form-input rounded-md mb-2"
+        className="form-input rounded-md mb-2 flex items-center justify-between"
         onClick={toggleDropdown}
         aria-expanded={isOpen}
       >
-        {title}
+        <div>{title}</div>
+        <i className={`mr-1 fas fa-chevron-${isOpen ? 'down' : 'right'}`}></i>
       </button>
       
       {isOpen && (
