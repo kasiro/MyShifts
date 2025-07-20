@@ -1891,6 +1891,7 @@
                 : 0;
               const shiftPenalty = shift.penalty || 0;
               const isUnpaid = shiftEarnings === 0;
+              const isAreaUnpaid = shift.areas?.filter(area => area.payment === 0);
               
               return {
                 totalEarnings: acc.totalEarnings + shiftEarnings - shiftPenalty,
@@ -1898,7 +1899,8 @@
                 totalShifts: acc.totalShifts + 1,
                 totalAreas: acc.totalAreas + (shift.areas?.length || 0),
                 totalPenalty: acc.totalPenalty + shiftPenalty,
-                totalUnpaid: acc.totalUnpaid + (isUnpaid ? 1 : 0)
+                totalUnpaid: acc.totalUnpaid + (isUnpaid ? 1 : 0),
+                totalAreasUnpaid: acc.totalAreasUnpaid + isAreaUnpaid.length
               };
             }, {
                 totalEarnings: 0,
@@ -1906,7 +1908,7 @@
                 totalShifts: 0,
                 totalAreas: 0,
                 totalPenalty: 0,
-                totalUnpaid: 0
+                totalUnpaid: 0,
                 totalAreasUnpaid: 0
             });
 
@@ -1961,10 +1963,8 @@
                             theme={theme}
                         />
                         <StatCardNoPay
-                          title="Смен без оплаты" 
-                          list_={[
-
-                          ]}
+                          title="Без оплаты" 
+                          stats={totalStats}
                           icon="sack-xmark" 
                           theme={theme}
                         />
@@ -2032,15 +2032,21 @@
             );
         }
 
-        function StatCardNoPay({ title, list_, icon, theme }) {
+        function StatCardNoPay({ title, stats, icon, theme }) {
+            const list_ = [
+                
+            ];
             return (
                 <div className="dark:bg-dark-800 bg-light-800 rounded-xl p-5 shadow">
                     <div className="flex justify-between items-start">
                         <div>
                             <h3 className="dark:text-gray-400 text-gray-600 text-sm">{title}</h3>
-                            {list_.map((el) => (
-                                <p className="text-2xl font-bold mt-1">{el.key}: {el.value}</p>
-                            ))}
+                            {stats.totalUnpaid > 0 && (
+                                <p className="text-md font-bold mt-1">Смен: {stats.totalUnpaid}</p>
+                            )}
+                            {stats.totalAreasUnpaid > 0 && (
+                                <p className="text-md font-bold mt-1">Участков: {stats.totalAreasUnpaid}</p>
+                            )}
                         </div>
                         <div className="dark:bg-dark-700 bg-light-700 p-3 rounded-lg text-xl">
                             <i className={`fas fa-${icon}`}></i>
