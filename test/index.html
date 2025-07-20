@@ -48,7 +48,7 @@
         // Инициализация IndexedDB
         const initDB = () => {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open('WorkShiftDB', 5);
+                const request = indexedDB.open('WorkShiftDB', 6);
                 
                 request.onupgradeneeded = (event) => {
                     const db = event.target.result;
@@ -75,6 +75,9 @@
                             { unique: true }
                         );
                     }
+                    if (!db.objectStoreNames.contains('range_settings')) {
+                        db.createObjectStore('range_settings', { keyPath: 'id' });
+                    }
                 };
                 
                 request.onsuccess = (event) => {
@@ -98,7 +101,7 @@
             return `${h} ч, ${min_} м`;
         };
 
-        // Сохранение данных в IndexedDB
+        // Базовые функции (уже есть в вашем коде)
         const saveData = async (storeName, data) => {
             const db = await initDB();
             return new Promise((resolve, reject) => {
@@ -113,98 +116,7 @@
                 request.onerror = () => reject(`Error saving to ${storeName}`);
             });
         };
-        
-        const checkStoreExists = async (storeName) => {
-            const db = await initDB();
-            return db.objectStoreNames.contains(storeName);
-        };
 
-        // Функции для работы с ценами материалов
-        // Сохранение цены материала
-        const saveMaterialPrice = async (priceData) => {
-            const db = await initDB();
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction('material_prices', 'readwrite');
-                const store = transaction.objectStore('material_prices');
-                
-                // Проверяем, существует ли уже такая запись
-                const index = store.index('area_material_idx');
-                const checkRequest = index.get([priceData.areaId, priceData.materialId]);
-                
-                checkRequest.onsuccess = () => {
-                    if (checkRequest.result) {
-                        // Обновляем существующую запись
-                        const existing = checkRequest.result;
-                        const updated = {
-                            ...existing,
-                            pricePerUnit: priceData.pricePerUnit,
-                            pricePerSheet: priceData.pricePerSheet
-                        };
-                        store.put(updated).onsuccess = resolve;
-                    } else {
-                        // Добавляем новую запись
-                        store.add({
-                            id: Date.now().toString(),
-                            ...priceData
-                        }).onsuccess = resolve;
-                    }
-                };
-                
-                transaction.onerror = () => reject(transaction.error);
-            });
-        };
-
-        // Получение цен по участку
-        const getMaterialPricesByArea = async (areaId) => {
-            const db = await initDB();
-            return new Promise((resolve) => {
-                const transaction = db.transaction('material_prices', 'readonly');
-                const store = transaction.objectStore('material_prices');
-                const prices = [];
-                
-                // Используем курсор для перебора всех записей
-                const request = store.openCursor();
-                
-                request.onsuccess = (e) => {
-                    const cursor = e.target.result;
-                    if (cursor) {
-                        if (cursor.value.areaId === areaId) {
-                            prices.push(cursor.value);
-                        }
-                        cursor.continue();
-                    } else {
-                        resolve(prices);
-                    }
-                };
-                
-                request.onerror = () => resolve([]);
-            });
-        };
-
-        // Получение конкретной цены
-        const getMaterialPrice = async (areaId, materialId) => {
-            const db = await initDB();
-            return new Promise((resolve) => {
-                const transaction = db.transaction('material_prices', 'readonly');
-                const store = transaction.objectStore('material_prices');
-                const index = store.index('area_material_idx');
-                
-                index.get([areaId, materialId]).onsuccess = (e) => resolve(e.target.result);
-            });
-        };
-
-        // Удаление цены
-        const deleteMaterialPrice = async (id) => {
-            const db = await initDB();
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction('material_prices', 'readwrite');
-                const store = transaction.objectStore('material_prices');
-                
-                store.delete(id).onsuccess = () => resolve();
-                transaction.onerror = () => reject(transaction.error);
-            });
-        };
-            // Получение данных из IndexedDB
         const getData = async (storeName, id) => {
             const db = await initDB();
             return new Promise((resolve, reject) => {
@@ -217,7 +129,6 @@
             });
         };
 
-        // Получение всех данных из хранилища
         const getAllData = async (storeName) => {
             const db = await initDB();
             return new Promise((resolve, reject) => {
@@ -230,7 +141,6 @@
             });
         };
 
-        // Удаление данных из IndexedDB
         const deleteData = async (storeName, id) => {
             const db = await initDB();
             return new Promise((resolve, reject) => {
@@ -244,6 +154,103 @@
                 request.onsuccess = () => resolve();
                 request.onerror = () => reject(`Error deleting from ${storeName}`);
             });
+        };
+
+        // 1. Для смен
+        const saveShift = async (shift) => {
+            return saveData('shifts', shift);
+        };
+
+        const getShift = async (shiftId) => {
+            return getData('shifts', shiftId);
+        };
+
+        const getAllShifts = async () => {
+            return getAllData('shifts');
+        };
+
+        const deleteShift = async (shiftId) => {
+            return deleteData('shifts', shiftId);
+        };
+
+        // 2. Для настроек
+        const saveTheme = async (theme) => {
+            return saveData('settings', { id: 'theme', value: theme });
+        };
+
+        const getTheme = async () => {
+            const theme = await getData('settings', 'theme');
+            return theme?.value || 'dark';
+        };
+
+        // 3. Для участков
+        const saveArea = async (area) => {
+            return saveData('areas', area);
+        };
+
+        const getAllAreas = async () => {
+            return getAllData('areas');
+        };
+
+        const deleteArea = async (areaId) => {
+            return deleteData('areas', areaId);
+        };
+
+        // 4. Для материалов
+        const saveMaterial = async (material) => {
+            return saveData('materials', material);
+        };
+
+        const getAllMaterials = async () => {
+            return getAllData('materials');
+        };
+
+        const deleteMaterial = async (materialId) => {
+            return deleteData('materials', materialId);
+        };
+
+        // 5. Для цен материалов
+        const saveMaterialPrice = async (priceData) => {
+            return saveData('material_prices', {
+                id: Date.now().toString(),
+                ...priceData
+            });
+        };
+
+        const getMaterialPricesByArea = async (areaId) => {
+            const allPrices = await getAllData('material_prices');
+            return allPrices.filter(price => price.areaId === areaId);
+        };
+
+        const getMaterialPrice = async (areaId, materialId) => {
+            const allPrices = await getAllData('material_prices');
+            return allPrices.find(price => 
+                price.areaId === areaId && price.materialId === materialId
+            );
+        };
+
+        const deleteMaterialPrice = async (priceId) => {
+            return deleteData('material_prices', priceId);
+        };
+
+        // 6. Для настроек диапазона
+        const saveRangeSettings = async ({ startDay, endDay }) => {
+            return saveData('range_settings', {
+                id: 'range_days',
+                startDay,
+                endDay
+            });
+        };
+
+        const getRangeSettings = async () => {
+            const settings = await getData('range_settings', 'range_days');
+            return settings || { startDay: 26, endDay: 24 }; // Значения по умолчанию
+        };
+
+        // Проверка существования хранилища
+        const checkStoreExists = async (storeName) => {
+            const db = await initDB();
+            return db.objectStoreNames.contains(storeName);
         };
 
         // Основной компонент приложения
@@ -946,13 +953,11 @@
             );
         }
         
-        function Group({ name, onClick, icon, children }) {
-            const [showGroup, setShowGroup] = useState(false);
-            
+        function Group({ name, onClick, icon, children, showGroup = false }) {
             return (
                 <div className="mt-4">
                     <button 
-                        onClick={() => setShowGroup(!showGroup)}
+                        onClick={onClick}
                         className="w-full text-left p-3 hover:dark:bg-dark-700 hover:bg-light-700 rounded-lg flex justify-between items-center"
                     >
                         <span>
@@ -1790,231 +1795,489 @@
                 </div>
             );
         }
+ 
+function ShiftItem({ shift, theme, formatDate }) {
+    const totalPayment = shift.areas?.reduce((sum, area) => sum + area.payment, 0) || 0;
+    
+    // Рассчитываем общее время смены с учетом обеда
+    const calculateTotalHours = () => {
+        if (!shift.areas || shift.areas.length === 0) return 0;
         
-        function ShiftItem({ shift, theme, formatDate }) {
-          const totalPayment = shift.areas?.reduce((sum, area) => sum + area.payment, 0);
-          const totalHours = shift.areas?.reduce((sum, area) => sum + parseFloat(area.workHours), 0) || 0;
-          
-
-          return (
-            <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-700'}`}>
-              <div className="flex flex-col">
+        // Находим самое раннее начало и самый поздний конец среди всех участков
+        const startTimes = shift.areas.map(area => area.startTime);
+        const endTimes = shift.areas.map(area => area.endTime);
+        
+        const earliestStart = startTimes.reduce((earliest, current) => 
+            current < earliest ? current : earliest);
+        const latestEnd = endTimes.reduce((latest, current) => 
+            current > latest ? current : latest);
+        
+        // Вычисляем общее время смены с учетом обеда
+        const totalHours = calculateWorkHours(
+            earliestStart, 
+            latestEnd, 
+            shift.lunchStart || '12:00', 
+            shift.lunchEnd || '13:00'
+        );
+        
+        return totalHours;
+    };
+    
+    const totalHours = calculateTotalHours();
+    
+    return (
+        <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-700'}`}>
+            <div className="flex flex-col">
                 <div>
-                  <div className="font-medium flex justify-between">
-                    {formatDate(shift.date)} - {totalHours.toFixed(0)}/ч
-                    {shift.areas.length > 0 && <span>участки</span>}
-                  </div>
-                  {shift.areas.length > 0 && (
-                      <div className="w-full text-sm p-2 flex flex-col font-bold items-center text-gray-500">
-                        <div className="w-full flex flex-col gap-2 items-center">
-                        {shift.areas?.map((area, index) => (
-                            <div className="flex w-full">
-                                <div className="w-full flex bg-light-600 justify-between dark:bg-dark-600 p-2 rounded-lg text-center">
-                                    <div>{area.name}</div>
-                                    <div className={`${area.payment === 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                      {area.payment === 0 ? 'Не оплачено' : `${area.payment} ₽`}
+                    <div className="font-medium flex justify-between">
+                        {formatDate(shift.date)} - {totalHours} ч
+                        {shift.areas.length > 0 && <span>участки</span>}
+                    </div>
+                    {shift.lunchStart && shift.lunchEnd && (
+                        <div className="text-xs dark:text-gray-400 text-gray-600 mt-1">
+                            Обед: {shift.lunchStart} - {shift.lunchEnd}
+                        </div>
+                    )}
+                    {shift.areas.length > 0 && (
+                        <div className="w-full text-sm p-2 flex flex-col font-bold items-center text-gray-500">
+                            <div className="w-full flex flex-col gap-2 items-center">
+                            {shift.areas?.map((area, index) => (
+                                <div
+                                    className="flex w-full"
+                                    key={`area-${index}-${area.name}`}
+                                >
+                                    <div className="w-full flex bg-light-600 justify-between dark:bg-dark-600 p-2 rounded-lg text-center">
+                                        <div>{area.name}</div>
+                                        <div className={`${area.payment === 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                          {area.payment === 0 ? 'Не оплачено' : `${area.payment} ₽`}
+                                        </div>
                                     </div>
                                 </div>
+                            ))}
                             </div>
-                        ))}
                         </div>
-                      </div>
-                  )}
+                    )}
                 </div>
                 <div className={`font-medium ${totalPayment === 0 ? 'text-red-500' : 'text-green-500'}`}>
                   {totalPayment === 0 ? 'Не оплачено' : `${totalPayment} ₽`}
                 </div>
-              </div>
             </div>
-          );
-        }
+        </div>
+    );
+}
 
-        // Компонент вкладки "Статистика"
-        function StatsTab({ shifts, theme }) {
-            // Расчет общей статистики
-            const [showUnpaid, setShowUnpaid] = useState(false);
+function StatsTab({ shifts, theme }) {
+    const [showUnpaid, setShowUnpaid] = useState(false);
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [customStartDate, setCustomStartDate] = useState('');
+    const [customEndDate, setCustomEndDate] = useState('');
+    const [periodMode, setPeriodMode] = useState('month'); // 'month' или 'custom'
+    const monthsContainerRef = useRef(null);
+    
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        
+        const daysShort = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+        const [year, month, day] = dateString.split('-');
+        const date = new Date(year, month - 1, day);
+        const dayOfWeek = daysShort[date.getDay()];
+        
+        return `${day}.${month}.${year} (${dayOfWeek})`;
+    };
+
+    const formatNumber = (number, options = {}) => {
+      const {
+        decimalSeparator = '.',
+        thousandsSeparator = ' ',
+        grouping = 3,
+        isfloat = false
+      } = options;
+
+      const parts = number.toLocaleString().split('.');
+      const integerPart = parts[0];
+      const fractionPart = parts[1] || '';
+      
+      let formattedInteger = '';
+      for (let i = 0; i < integerPart.length; i += grouping) {
+        formattedInteger += (formattedInteger ? thousandsSeparator : '') +
+          integerPart.substr(i, grouping);
+      }
+      if (formattedInteger.includes(',') && !isfloat) {
+        return formattedInteger.slice(0, -3);
+      }
+      return formattedInteger + (fractionPart && isfloat ? decimalSeparator + fractionPart : '');
+    }
+
+    // Генерация списка месяцев с учетом наличия смен
+    const generateMonthsWithShifts = () => {
+        const monthsWithShifts = new Set();
+        
+        // Собираем все месяцы, в которых есть смены
+        shifts.forEach(shift => {
+            const date = new Date(shift.date);
+            const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+            monthsWithShifts.add(monthKey);
+        });
+        
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth();
+        const months = [];
+        
+        // Добавляем 12 месяцев назад и 12 вперед, но только те, где есть смены
+        for (let i = -12; i <= 12; i++) {
+            const date = new Date(currentYear, currentMonth + i, 1);
+            const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
             
-            const formatNumber = (number, options = {}) => {
-              const {
-                decimalSeparator = '.',
-                thousandsSeparator = ' ',
-                grouping = 3,
-                isfloat = false
-              } = options;
-
-              const parts = number.toLocaleString().split('.');
-              const integerPart = parts[0];
-              const fractionPart = parts[1] || '';
-              
-              let formattedInteger = '';
-              for (let i = 0; i < integerPart.length; i += grouping) {
-                formattedInteger += (formattedInteger ? thousandsSeparator : '') +
-                  integerPart.substr(i, grouping);
-              }
-              if (formattedInteger.includes(',') && !isfloat) {
-                return formattedInteger.slice(0, -3);
-              }
-              return formattedInteger + (fractionPart && isfloat ? decimalSeparator + fractionPart : '');
+            if (monthsWithShifts.has(monthKey) || (date.getFullYear() === currentYear && date.getMonth() === currentMonth)) {
+                months.push({
+                    year: date.getFullYear(),
+                    month: date.getMonth(),
+                    name: date.toLocaleString('ru-RU', { month: 'short' }),
+                    fullName: date.toLocaleString('ru-RU', { month: 'long', year: 'numeric' }),
+                    isCurrent: i === 0
+                });
             }
-
-            const calculateShiftTotalHours = (shift) => {
-                if (!shift.areas || shift.areas.length === 0) return null;
+        }
+        
+        return months;
+    };
+    
+    const months = useMemo(generateMonthsWithShifts, [shifts]);
+    
+    // Прокрутка к выбранному месяцу при изменении
+    useEffect(() => {
+        if (monthsContainerRef.current) {
+            const selectedIndex = months.findIndex(m => 
+                m.month === selectedMonth && m.year === selectedYear
+            );
+            
+            if (selectedIndex !== -1) {
+                const container = monthsContainerRef.current;
+                const monthElement = container.children[selectedIndex];
                 
-                // Находим самое раннее начало и самый поздний конец среди всех участков
-                const startTimes = shift.areas.map(area => area.startTime);
-                const endTimes = shift.areas.map(area => area.endTime);
-                
-                const earliestStart = startTimes.reduce((earliest, current) => 
-                    current < earliest ? current : earliest);
-                const latestEnd = endTimes.reduce((latest, current) => 
-                    current > latest ? current : latest);
-                
-                // Вычисляем общее время смены
-                const totalHours = calculateWorkHours(
-                    earliestStart, 
-                    latestEnd, 
-                    shift.lunchStart || '12:00', 
-                    shift.lunchEnd || '13:00'
-                );
-                
-                return {
-                    start: earliestStart,
-                    end: latestEnd,
-                    total: totalHours
-                };
-            };
-
-            const totalStats = shifts.reduce((acc, shift) => {
-              const shiftEarnings = shift.areas?.reduce((sum, area) => sum + area.payment, 0) || 0;
-              const shiftHours = shift.areas?.length 
-                ? calculateShiftTotalHours(shift).total // Уже целые часы
-                : 0;
-              const shiftPenalty = shift.penalty || 0;
-              const isUnpaid = shiftEarnings === 0;
-              const isAreaUnpaid = shift.areas?.filter(area => area.payment === 0);
-              
-              return {
-                totalEarnings: acc.totalEarnings + shiftEarnings - shiftPenalty,
-                totalHours: acc.totalHours + shiftHours, // Только целые часы
-                totalShifts: acc.totalShifts + 1,
-                totalAreas: acc.totalAreas + (shift.areas?.length || 0),
-                totalPenalty: acc.totalPenalty + shiftPenalty,
-                totalUnpaid: acc.totalUnpaid + (isUnpaid ? 1 : 0),
-                totalAreasUnpaid: acc.totalAreasUnpaid + isAreaUnpaid.length
-              };
-            }, {
-                totalEarnings: 0,
-                totalHours: 0,
-                totalShifts: 0,
-                totalAreas: 0,
-                totalPenalty: 0,
-                totalUnpaid: 0,
-                totalAreasUnpaid: 0
-            });
-
-            const filteredShifts = showUnpaid
-            ? shifts.filter(shift => {
-                const payment = shift.areas?.reduce((sum, area) => sum + area.payment, 0) || 0;
-                const paymentByArea = shift.areas?.filter((area) => area.payment === 0);
-                return payment === 0 || paymentByArea.length > 0;
-              })
-            : shifts.slice(0, 5);
-
-            const formatDate = (dateString) => {
-              if (!dateString) return '';
-              
-              const daysShort = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-              const [year, month, day] = dateString.split('-');
-              const date = new Date(year, month - 1, day);
-              const dayOfWeek = daysShort[date.getDay()];
-              
-              return `${day}.${month}.${year} (${dayOfWeek})`;
-            };
-
-            return (
-                <div>
-                    <h2 className="text-xl font-bold mb-6">Статистика</h2>
+                if (monthElement) {
+                    const containerWidth = container.offsetWidth;
+                    const monthLeft = monthElement.offsetLeft;
+                    const monthWidth = monthElement.offsetWidth;
+                    const scrollTo = monthLeft + monthWidth/2 - containerWidth/2;
                     
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                        <StatCard 
-                            title="Всего смен" 
-                            value={totalStats.totalShifts} 
-                            icon="calendar-day" 
-                            theme={theme}
-                        />
-                        <StatCard 
-                            title="Всего часов" 
-                            value={totalStats.totalHours} 
-                            icon="clock" 
-                            theme={theme}
-                        />
-                        <StatCard 
-                            title="Всего участков" 
-                            value={totalStats.totalAreas} 
-                            icon="compass" 
-                            theme={theme}
-                        />
-                        <StatCard 
-                            title="Общий заработок" 
-                            value={
-                                `${formatNumber(totalStats.totalEarnings)} ₽`
-                            }
-                            icon="money-bill-wave" 
-                            theme={theme}
-                        />
-                        <StatCardNoPay
-                          title="Без оплаты" 
-                          stats={totalStats}
-                          icon="sack-xmark" 
-                          theme={theme}
-                        />
-                        <StatCard 
-                            title="Общий штраф" 
-                            value={`${totalStats.totalPenalty.toFixed(2)} ₽`} 
-                            icon="exclamation-triangle" 
-                            theme={theme}
-                        />
-                    </div>
+                    container.scrollTo({
+                        left: scrollTo,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+        }
+    }, [selectedMonth, selectedYear, months]);
+    
+    const getPeriodDates = async () => {
+        if (periodMode === 'month') {
+            // Получаем сохраненные настройки диапазона
+            const settings = await getRangeSettings();
+            const { startDay = 26, endDay = 24 } = settings || {};
+            
+            const firstDay = new Date(selectedYear, selectedMonth, startDay);
+            const lastDay = new Date(selectedYear, selectedMonth + 1, endDay);
+            
+            // Корректировка для декабря
+            if (selectedMonth === 11) {
+                lastDay.setFullYear(selectedYear + 1);
+            }
+            
+            // Корректировка для января
+            if (selectedMonth === 0) {
+                firstDay.setFullYear(selectedYear - 1);
+                firstDay.setMonth(11); // Декабрь предыдущего года
+            }
+            
+            return {
+                start: firstDay.toISOString().split('T')[0],
+                end: lastDay.toISOString().split('T')[0],
+                periodString: `${firstDay.getDate()}.${String(firstDay.getMonth() + 1).padStart(2, '0')} - ${lastDay.getDate()}.${String(lastDay.getMonth() + 1).padStart(2, '0')}`,
+                label: new Date(selectedYear, selectedMonth, 1).toLocaleString('ru-RU', { month: 'long', year: 'numeric' })
+            };
+        } else {
+            return {
+                start: customStartDate,
+                end: customEndDate,
+                periodString: customStartDate && customEndDate 
+                    ? `${formatDate(customStartDate)} - ${formatDate(customEndDate)}`
+                    : 'Выберите даты',
+                label: customStartDate && customEndDate 
+                    ? `${formatDate(customStartDate)} - ${formatDate(customEndDate)}`
+                    : 'Выберите даты'
+            };
+        }
+    };
 
-                    <div className="dark:bg-dark-800 bg-light-800 rounded-xl p-6 shadow">
-                        <div className="w-full flex justify-between items-center mb-4">
-                          <h3 className="font-medium">
-                            <i className="fas fa-history mr-2"></i>
-                            {showUnpaid ? 'Смены без оплаты' : 'Последние смены'}
-                          </h3>
-                          <label className="flex items-center space-x-2">
-                            <span className="text-sm">без оплаты</span>
-                            <input 
-                              type="checkbox" 
-                              checked={showUnpaid}
-                              onChange={() => setShowUnpaid(!showUnpaid)}
-                              className={`h-4 w-4 rounded ${theme === 'dark' ? 'bg-dark-600 border-dark-500' : 'bg-white border-gray-300'} text-primary-600 focus:ring-primary-500`}
-                            />
-                          </label>
+    const [periodData, setPeriodData] = useState({
+        start: '',
+        end: '',
+        periodString: '',
+        label: ''
+    });
+
+    useEffect(() => {
+        const loadPeriodData = async () => {
+            const data = await getPeriodDates();
+            setPeriodData(data);
+        };
+        
+        loadPeriodData();
+    }, [periodMode, selectedMonth, selectedYear, customStartDate, customEndDate]);
+
+    const { start: periodStart, end: periodEnd, periodString, label: periodLabel } = periodData;
+    
+    // Фильтрация смен по выбранному периоду
+    const filteredShifts = shifts.filter(shift => {
+        if (!periodStart && !periodEnd) return true;
+        
+        const shiftDate = new Date(shift.date);
+        const startDate = periodStart ? new Date(periodStart) : null;
+        const endDate = periodEnd ? new Date(periodEnd) : null;
+        
+        let valid = true;
+        if (startDate) valid = valid && shiftDate >= startDate;
+        if (endDate) valid = valid && shiftDate <= endDate;
+        return valid;
+    });
+
+    const calculateShiftTotalHours = (shift) => {
+        if (!shift.areas || shift.areas.length === 0) return null;
+        
+        // Находим самое раннее начало и самый поздний конец среди всех участков
+        const startTimes = shift.areas.map(area => area.startTime);
+        const endTimes = shift.areas.map(area => area.endTime);
+        
+        const earliestStart = startTimes.reduce((earliest, current) => 
+            current < earliest ? current : earliest);
+        const latestEnd = endTimes.reduce((latest, current) => 
+            current > latest ? current : latest);
+        
+        // Вычисляем общее время смены
+        const totalHours = calculateWorkHours(
+            earliestStart, 
+            latestEnd, 
+            shift.lunchStart || '12:00', 
+            shift.lunchEnd || '13:00'
+        );
+        
+        return {
+            start: earliestStart,
+            end: latestEnd,
+            total: totalHours
+        };
+    };
+
+    const showUnpaidShifts = showUnpaid
+        ? filteredShifts.filter(shift => {
+            const payment = shift.areas?.reduce((sum, area) => sum + area.payment, 0) || 0;
+            const paymentByArea = shift.areas?.filter((area) => area.payment === 0);
+            return payment === 0 || paymentByArea.length > 0;
+        })
+        : filteredShifts.slice(0, 5);
+
+    const totalStats = filteredShifts.reduce((acc, shift) => {
+        const shiftEarnings = shift.areas?.reduce((sum, area) => sum + area.payment, 0) || 0;
+        const shiftHours = shift.areas?.length 
+            ? calculateShiftTotalHours(shift).total
+            : 0;
+        const shiftPenalty = shift.penalty || 0;
+        const isUnpaid = shiftEarnings === 0;
+        const isAreaUnpaid = shift.areas?.filter(area => area.payment === 0);
+        
+        return {
+            totalEarnings: acc.totalEarnings + shiftEarnings - shiftPenalty,
+            totalHours: acc.totalHours + shiftHours,
+            totalShifts: acc.totalShifts + 1,
+            totalAreas: acc.totalAreas + (shift.areas?.length || 0),
+            totalPenalty: acc.totalPenalty + shiftPenalty,
+            totalUnpaid: acc.totalUnpaid + (isUnpaid ? 1 : 0),
+            totalAreasUnpaid: acc.totalAreasUnpaid + isAreaUnpaid.length
+        };
+    }, {
+        totalEarnings: 0,
+        totalHours: 0,
+        totalShifts: 0,
+        totalAreas: 0,
+        totalPenalty: 0,
+        totalUnpaid: 0,
+        totalAreasUnpaid: 0
+    });
+
+    return (
+        <div>
+            <h2 className="text-xl font-bold mb-6">Статистика</h2>
+            
+            {/* Панель выбора периода */}
+            <div className="dark:bg-dark-800 bg-light-800 rounded-xl p-4 mb-6 shadow">
+                <div className="flex flex-col gap-4">
+                    <div className="flex justify-around gap-2">
+                        <button
+                            onClick={() => setPeriodMode('month')}
+                            className={`px-4 py-2 rounded-lg text-sm ${
+                                periodMode === 'month'
+                                    ? 'bg-primary-600 text-white'
+                                    : 'dark:bg-dark-700 bg-light-700 hover:dark:bg-dark-600 hover:bg-light-600'
+                            }`}
+                        >
+                            По месяцам
+                        </button>
+                        <button
+                            onClick={() => setPeriodMode('custom')}
+                            className={`px-4 py-2 rounded-lg text-sm ${
+                                periodMode === 'custom'
+                                    ? 'bg-primary-600 text-white'
+                                    : 'dark:bg-dark-700 bg-light-700 hover:dark:bg-dark-600 hover:bg-light-600'
+                            }`}
+                        >
+                            Свой Период
+                        </button>
+                    </div>
+                    
+                    {periodMode === 'month' ? (
+                        <div className="mt-2">
+                            <div className="text-sm font-medium mb-2">
+                                {periodLabel} ({periodString})
+                            </div>
+                            <div 
+                                ref={monthsContainerRef}
+                                className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+                                style={{ scrollSnapType: 'x mandatory' }}
+                            >
+                                {months.map((m, index) => (
+                                    <button
+                                        key={index}
+                                        onClick={() => {
+                                            setSelectedMonth(m.month);
+                                            setSelectedYear(m.year);
+                                        }}
+                                        className={`flex-shrink-0 px-4 py-2 rounded-lg scroll-snap-align-center whitespace-nowrap ${
+                                            selectedMonth === m.month && selectedYear === m.year
+                                                ? 'bg-primary-600 text-white'
+                                                : 'dark:bg-dark-700 bg-light-700 hover:dark:bg-dark-600 hover:bg-light-600'
+                                        }`}
+                                        style={{ scrollSnapAlign: 'center' }}
+                                    >
+                                        {m.name} {m.year}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                        
-                        {filteredShifts.length > 0 ? (
-                          <div className="space-y-3">
-                            {filteredShifts.map(shift => (
-                              <ShiftItem
+                    ) : (
+                        <div className="mt-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm mb-1">Начальная дата</label>
+                                    <input
+                                        type="date"
+                                        value={customStartDate}
+                                        onChange={(e) => setCustomStartDate(e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm mb-1">Конечная дата</label>
+                                    <input
+                                        type="date"
+                                        value={customEndDate}
+                                        onChange={(e) => setCustomEndDate(e.target.value)}
+                                        className="w-full dark:bg-dark-700 bg-light-700 border dark:border-dark-600 border-light-500 rounded-lg px-3 py-2 text-sm"
+                                    />
+                                </div>
+                            </div>
+                            {customStartDate && customEndDate && (
+                                <div className="mt-2 text-center text-sm dark:text-gray-400 text-gray-600">
+                                    Выбран период: {formatDate(customStartDate)} - {formatDate(customEndDate)}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <StatCard 
+                    title="Всего смен" 
+                    value={totalStats.totalShifts} 
+                    icon="calendar-day" 
+                    theme={theme}
+                />
+                <StatCard 
+                    title="Всего часов" 
+                    value={totalStats.totalHours} 
+                    icon="clock" 
+                    theme={theme}
+                />
+                <StatCard 
+                    title="Всего участков" 
+                    value={totalStats.totalAreas} 
+                    icon="compass" 
+                    theme={theme}
+                />
+                <StatCard 
+                    title="Общий заработок" 
+                    value={
+                        `${formatNumber(totalStats.totalEarnings)} ₽`
+                    }
+                    icon="money-bill-wave" 
+                    theme={theme}
+                />
+                <StatCardNoPay
+                  title="Без оплаты" 
+                  stats={totalStats}
+                  icon="sack-xmark" 
+                  theme={theme}
+                />
+                <StatCard 
+                    title="Общий штраф" 
+                    value={`${totalStats.totalPenalty.toFixed(2)} ₽`} 
+                    icon="exclamation-triangle" 
+                    theme={theme}
+                />
+            </div>
+            
+            <div className="dark:bg-dark-800 bg-light-800 rounded-xl p-6 shadow">
+                <div className="w-full flex justify-between items-center mb-4">
+                    <h3 className="font-medium">
+                        <i className="fas fa-history mr-2"></i>
+                        {showUnpaid ? 'Смены без оплаты' : 'Последние смены'}
+                    </h3>
+                    <label className="flex items-center space-x-2">
+                        <span className="text-sm">без оплаты</span>
+                        <input 
+                            type="checkbox" 
+                            checked={showUnpaid}
+                            onChange={() => setShowUnpaid(!showUnpaid)}
+                            className={`h-4 w-4 rounded ${theme === 'dark' ? 'bg-dark-600 border-dark-500' : 'bg-white border-gray-300'} text-primary-600 focus:ring-primary-500`}
+                        />
+                    </label>
+                </div>
+                
+                {showUnpaidShifts.length > 0 ? (
+                    <div className="space-y-3">
+                        {showUnpaidShifts.map((shift, index) => (
+                            <ShiftItem
                                 key={shift.id}
                                 formatDate={formatDate}
                                 shift={shift}
                                 theme={theme}
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className={`text-center py-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'}`}>
-                            <i className="fas fa-database mr-2"></i>
-                            {showUnpaid ? 'Нет смен без оплаты' : 'Нет данных'}
-                          </div>
-                        )}
+                            />
+                        ))}
                     </div>
-                </div>
-            );
-        }
-        
+                ) : (
+                    <div className={`text-center py-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'}`}>
+                        <i className="fas fa-database mr-2"></i>
+                        {showUnpaid ? 'Нет смен без оплаты' : 'Нет данных'}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
         // Компонент карточки статистики
         function StatCard({ title, value, icon, theme }) {
             return (
@@ -2033,19 +2296,16 @@
         }
 
         function StatCardNoPay({ title, stats, icon, theme }) {
-            const list_ = [
-                
-            ];
             return (
                 <div className="dark:bg-dark-800 bg-light-800 rounded-xl p-5 shadow">
                     <div className="flex justify-between items-start">
                         <div>
                             <h3 className="dark:text-gray-400 text-gray-600 text-sm">{title}</h3>
                             {stats.totalUnpaid > 0 && (
-                                <p className="text-md font-bold mt-1">Смен: {stats.totalUnpaid}</p>
+                                <p className="text-xl font-bold mt-1">Смен: {stats.totalUnpaid}</p>
                             )}
                             {stats.totalAreasUnpaid > 0 && (
-                                <p className="text-md font-bold mt-1">Участков: {stats.totalAreasUnpaid}</p>
+                                <p className="text-xl font-bold mt-1">Участков: {stats.totalAreasUnpaid}</p>
                             )}
                         </div>
                         <div className="dark:bg-dark-700 bg-light-700 p-3 rounded-lg text-xl">
@@ -2075,6 +2335,27 @@
             const [newAreaName, setNewAreaName] = useState('');
             const [newMaterialName, setNewMaterialName] = useState('');           
             const [showMaterialPrices, setShowMaterialPrices] = useState(false);
+            const [rangeSettings, setRangeSettings] = useState({ startDay: 26, endDay: 24 });
+            const [showRangeSettings, setShowRangeSettings] = useState(false);
+
+            // Загрузим настройки при монтировании
+            useEffect(() => {
+                const loadRangeSettings = async () => {
+                    const settings = await getRangeSettings();
+                    setRangeSettings(settings);
+                };
+                loadRangeSettings();
+            }, []);
+
+            // Обработчик сохранения настроек диапазона
+            const handleSaveRangeSettings = async () => {
+                try {
+                    await saveRangeSettings(rangeSettings);
+                    setShowRangeSettings(false);
+                } catch (error) {
+                    console.error('Ошибка сохранения настроек диапазона:', error);
+                }
+            };
 
             const handleAddArea = () => {
                 if (newAreaName.trim()) {
@@ -2273,6 +2554,65 @@
                                 setShowMaterialPrices={setShowMaterialPrices}
                                 SelectInput={SelectInput}
                             />
+                            <Group 
+                                name="Настройки диапазона статистики" 
+                                icon="calendar-week"
+                                onClick={() => setShowRangeSettings(!showRangeSettings)}
+                                showGroup={showRangeSettings}
+                            >
+                                {showRangeSettings && (
+                                    <div className="mt-4 space-y-4 dark:bg-dark-700 bg-light-700 p-4 rounded-lg">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium mb-1">
+                                                    Начальный день
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="31"
+                                                    value={rangeSettings.startDay}
+                                                    onChange={(e) => setRangeSettings({
+                                                        ...rangeSettings,
+                                                        startDay: parseInt(e.target.value) || ''
+                                                    })}
+                                                    className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-3 py-2 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium mb-1">
+                                                    Конечный день
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="31"
+                                                    value={rangeSettings.endDay}
+                                                    onChange={(e) => setRangeSettings({
+                                                        ...rangeSettings,
+                                                        endDay: parseInt(e.target.value) || ''
+                                                    })}
+                                                    className="w-full dark:bg-dark-600 bg-light-600 border dark:border-dark-500 border-light-400 rounded-lg px-3 py-2 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => setShowRangeSettings(false)}
+                                                className="flex-1 dark:bg-dark-600 bg-light-600 hover:dark:bg-dark-500 hover:bg-light-500 py-2 rounded-lg"
+                                            >
+                                                Отмена
+                                            </button>
+                                            <button
+                                                onClick={handleSaveRangeSettings}
+                                                className="flex-1 bg-primary-600 hover:bg-primary-700 py-2 rounded-lg text-white"
+                                            >
+                                                Сохранить
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </Group>
                         </div>
                     </div>
                 </div>
